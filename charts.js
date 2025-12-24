@@ -157,5 +157,158 @@ class LossChart {
     }
 }
 
+
+/**
+ * Accuracy Chart
+ * Similar to LossChart but for accuracy percentage
+ */
+class AccuracyChart {
+    constructor(canvasId) {
+        this.canvas = document.getElementById(canvasId);
+        this.ctx = this.canvas.getContext('2d');
+
+        this.accuracyHistory = [];
+        this.maxPoints = 500;
+
+        this.colors = {
+            grid: 'rgba(255, 255, 255, 0.05)',
+            line: '#10b981', // Green for accuracy
+            fill: 'rgba(16, 185, 129, 0.2)',
+            text: '#606070'
+        };
+
+        this.setupResize();
+    }
+
+    setupResize() {
+        const resizeObserver = new ResizeObserver(() => {
+            this.resize();
+        });
+        resizeObserver.observe(this.canvas.parentElement);
+    }
+
+    resize() {
+        const rect = this.canvas.parentElement.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+
+        this.canvas.width = rect.width * dpr;
+        this.canvas.height = rect.height * dpr;
+
+        this.ctx.scale(dpr, dpr);
+
+        this.width = rect.width;
+        this.height = rect.height;
+
+        this.render();
+    }
+
+    update(accuracyHistory) {
+        if (accuracyHistory.length > this.maxPoints) {
+            this.accuracyHistory = accuracyHistory.slice(-this.maxPoints);
+        } else {
+            this.accuracyHistory = [...accuracyHistory];
+        }
+        this.render();
+    }
+
+    clear() {
+        this.accuracyHistory = [];
+        this.render();
+    }
+
+    render() {
+        if (!this.ctx) return;
+
+        const ctx = this.ctx;
+        const padding = 35;
+
+        ctx.clearRect(0, 0, this.width, this.height);
+
+        if (this.accuracyHistory.length < 2) {
+            this.drawEmptyState();
+            return;
+        }
+
+        const plotWidth = this.width - padding * 2;
+        const plotHeight = this.height - padding * 2;
+
+        // Accuracy is 0-100%
+        const maxAcc = 100;
+        const minAcc = 0;
+
+        // Draw grid
+        ctx.strokeStyle = this.colors.grid;
+        ctx.lineWidth = 1;
+
+        for (let i = 0; i <= 4; i++) {
+            const y = padding + (i / 4) * plotHeight;
+            ctx.beginPath();
+            ctx.moveTo(padding, y);
+            ctx.lineTo(this.width - padding, y);
+            ctx.stroke();
+        }
+
+        // Draw accuracy curve
+        ctx.beginPath();
+
+        for (let i = 0; i < this.accuracyHistory.length; i++) {
+            const x = padding + (i / (this.accuracyHistory.length - 1)) * plotWidth;
+            const normalizedAcc = (this.accuracyHistory[i] - minAcc) / (maxAcc - minAcc);
+            const y = padding + (1 - normalizedAcc) * plotHeight;
+
+            if (i === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        }
+
+        ctx.strokeStyle = this.colors.line;
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+
+        // Fill under curve
+        const lastX = padding + plotWidth;
+        ctx.lineTo(lastX, padding + plotHeight);
+        ctx.lineTo(padding, padding + plotHeight);
+        ctx.closePath();
+
+        const gradient = ctx.createLinearGradient(0, padding, 0, padding + plotHeight);
+        gradient.addColorStop(0, 'rgba(16, 185, 129, 0.3)');
+        gradient.addColorStop(1, 'rgba(16, 185, 129, 0)');
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        // Y-axis labels (percentages)
+        ctx.fillStyle = this.colors.text;
+        ctx.font = '10px Inter, sans-serif';
+        ctx.textAlign = 'right';
+
+        for (let i = 0; i <= 4; i++) {
+            const value = maxAcc * (1 - i / 4);
+            const y = padding + (i / 4) * plotHeight;
+            ctx.fillText(value.toFixed(0) + '%', padding - 5, y + 3);
+        }
+
+        // X-axis labels
+        ctx.textAlign = 'center';
+        const epochCount = this.accuracyHistory.length;
+        ctx.fillText('0', padding, this.height - padding + 15);
+        ctx.fillText(epochCount.toString(), this.width - padding, this.height - padding + 15);
+        ctx.fillText('Epochs', this.width / 2, this.height - 5);
+    }
+
+    drawEmptyState() {
+        const ctx = this.ctx;
+        ctx.fillStyle = this.colors.text;
+        ctx.font = '12px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Start training to see accuracy', this.width / 2, this.height / 2);
+    }
+}
+
 // Export
 window.LossChart = LossChart;
+window.AccuracyChart = AccuracyChart;

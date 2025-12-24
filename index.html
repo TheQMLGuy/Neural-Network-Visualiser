@@ -55,6 +55,24 @@
                     <option value="leaky_relu">Leaky ReLU</option>
                     <option value="elu">ELU</option>
                     <option value="swish">Swish</option>
+                    <option value="gelu">GELU</option>
+                    <option value="selu">SELU</option>
+                    <option value="mish">Mish</option>
+                    <option value="softplus">Softplus</option>
+                    <option value="softsign">Softsign</option>
+                    <option value="prelu">PReLU</option>
+                    <option value="celu">CELU</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="loss-select">Loss Function</label>
+                <select id="loss-select" class="select">
+                    <option value="mse" selected>MSE</option>
+                    <option value="mae">MAE</option>
+                    <option value="huber">Huber</option>
+                    <option value="log_cosh">Log-Cosh</option>
+                    <option value="smooth_l1">Smooth L1</option>
                 </select>
             </div>
 
@@ -71,15 +89,26 @@
             </div>
 
             <div class="control-group">
+                <label for="init-select">Weight Init</label>
+                <select id="init-select" class="select">
+                    <option value="xavier" selected>Xavier</option>
+                    <option value="he">He</option>
+                    <option value="lecun">LeCun</option>
+                    <option value="uniform">Uniform</option>
+                    <option value="normal">Normal</option>
+                    <option value="small_random">Small Random</option>
+                </select>
+            </div>
+
+            <div class="control-group">
                 <label for="learning-rate">Learning Rate</label>
                 <input type="number" id="learning-rate" class="input" value="0.01" min="0.0001" max="1" step="0.001">
             </div>
 
             <div class="control-group">
-                <label for="target-function">Target Function <span id="fn-count" class="fn-count">(100+)</span></label>
+                <label for="target-function">Target <span id="fn-count" class="fn-count">(100+)</span></label>
                 <div class="searchable-select">
-                    <input type="text" id="target-search" class="input" placeholder="Search functions..."
-                        autocomplete="off">
+                    <input type="text" id="target-search" class="input" placeholder="Search..." autocomplete="off">
                     <select id="target-function" class="select"></select>
                 </div>
             </div>
@@ -87,12 +116,12 @@
             <div class="control-group">
                 <label for="step-size">Step Size</label>
                 <select id="step-size" class="select select-sm">
-                    <option value="1">1 epoch</option>
-                    <option value="5" selected>5 epochs</option>
-                    <option value="10">10 epochs</option>
-                    <option value="50">50 epochs</option>
-                    <option value="100">100 epochs</option>
-                    <option value="500">500 epochs</option>
+                    <option value="1">1</option>
+                    <option value="5" selected>5</option>
+                    <option value="10">10</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                    <option value="500">500</option>
                 </select>
             </div>
 
@@ -110,9 +139,9 @@
         </section>
 
         <!-- Main Visualization Area -->
-        <main class="main-content">
+        <main class="main-content resizable-grid">
             <!-- Network Graph -->
-            <section class="panel network-panel">
+            <section class="panel network-panel resizable">
                 <div class="panel-header">
                     <h2>Network Graph</h2>
                     <span id="weight-count" class="badge">0 weights</span>
@@ -124,13 +153,13 @@
             </section>
 
             <!-- Curve Fitting -->
-            <section id="curve-panel" class="panel curve-panel">
+            <section id="curve-panel" class="panel curve-panel resizable">
                 <div class="panel-header">
                     <h2>Curve Fitting</h2>
                     <div class="header-right">
                         <div class="legend">
                             <span class="legend-item target">┄ Target</span>
-                            <span class="legend-item activation">● σ(x) Shape</span>
+                            <span class="legend-item activation">● σ(x)</span>
                             <span class="legend-item weighted">● Weighted</span>
                             <span class="legend-item result">● Result</span>
                         </div>
@@ -142,39 +171,26 @@
                 </div>
             </section>
 
-            <!-- Training Info -->
-            <section class="panel loss-panel">
+            <!-- Loss Chart -->
+            <section class="panel loss-panel resizable">
                 <div class="panel-header">
-                    <h2>Training Progress</h2>
-                    <span id="current-loss" class="badge loss-badge">Loss: 0.0000</span>
+                    <h2>Loss</h2>
+                    <span id="current-loss" class="badge loss-badge" title="Right-click to log observation">Loss:
+                        0.0000</span>
                 </div>
                 <div class="panel-body">
                     <canvas id="loss-canvas"></canvas>
                 </div>
             </section>
 
-            <!-- Weights Info -->
-            <section class="panel weights-panel">
+            <!-- Accuracy Chart -->
+            <section class="panel accuracy-panel resizable">
                 <div class="panel-header">
-                    <h2>Weight Statistics</h2>
+                    <h2>Accuracy</h2>
+                    <span id="current-accuracy" class="badge accuracy-badge">0.00%</span>
                 </div>
-                <div class="panel-body stats-grid">
-                    <div class="stat">
-                        <span class="stat-label">Min Weight</span>
-                        <span id="min-weight" class="stat-value">0.00</span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-label">Max Weight</span>
-                        <span id="max-weight" class="stat-value">0.00</span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-label">Avg |Weight|</span>
-                        <span id="avg-weight" class="stat-value">0.00</span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-label">Avg |Gradient|</span>
-                        <span id="avg-gradient" class="stat-value">0.00</span>
-                    </div>
+                <div class="panel-body">
+                    <canvas id="accuracy-canvas"></canvas>
                 </div>
             </section>
         </main>
@@ -202,6 +218,38 @@
                         <div id="calc-current" class="calc-math"></div>
                     </div>
                 </div>
+            </div>
+        </section>
+
+        <!-- Observation Table -->
+        <section id="observations-section" class="observations-section collapsed">
+            <div class="observations-header">
+                <h2>Observation Table</h2>
+                <div class="header-right">
+                    <button id="export-observations" class="btn btn-sm">📥 Export CSV</button>
+                    <button id="clear-observations" class="btn btn-sm btn-danger">Clear</button>
+                    <button id="toggle-observations" class="btn btn-sm">▼ Show</button>
+                </div>
+            </div>
+            <div class="observations-content">
+                <table id="observations-table" class="observations-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Hidden Layers</th>
+                            <th>Activation</th>
+                            <th>Loss Fn</th>
+                            <th>Optimizer</th>
+                            <th>Init</th>
+                            <th>LR</th>
+                            <th>Epoch</th>
+                            <th>Loss</th>
+                            <th>Accuracy</th>
+                            <th>Timestamp</th>
+                        </tr>
+                    </thead>
+                    <tbody id="observations-body"></tbody>
+                </table>
             </div>
         </section>
     </div>
@@ -233,6 +281,7 @@
     <script src="curve-visualizer.js"></script>
     <script src="charts.js"></script>
     <script src="calculations-panel.js"></script>
+    <script src="observations.js"></script>
     <script src="app.js"></script>
 </body>
 

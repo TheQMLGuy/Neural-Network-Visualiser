@@ -9,13 +9,16 @@ class App {
         this.layerSizes = [1, 8, 8, 1];
         this.activationName = 'sigmoid';
         this.optimizerName = 'adam';
+        this.lossFunctionName = 'mse';
+        this.weightInitName = 'xavier';
         this.learningRate = 0.01;
         this.targetFunctionName = 'sine';
 
         // Training state
         this.isPlaying = false;
         this.animationId = null;
-        this.stepSize = 5; // Epochs per step (from dropdown)
+        this.stepSize = 5;
+        this.accuracyHistory = [];
 
         // Initialize components
         this.initNetwork();
@@ -40,7 +43,9 @@ class App {
         this.networkViz = new NetworkVisualizer('network-canvas', 'tooltip');
         this.curveViz = new CurveVisualizer('curve-canvas');
         this.lossChart = new LossChart('loss-canvas');
+        this.accuracyChart = new AccuracyChart('accuracy-canvas');
         this.calcPanel = new CalculationsPanel();
+        this.observationsPanel = new ObservationsPanel();
 
         this.networkViz.setNetwork(this.network);
         this.curveViz.setNetwork(this.network);
@@ -84,6 +89,18 @@ class App {
         document.getElementById('learning-rate').addEventListener('change', (e) => {
             this.learningRate = parseFloat(e.target.value) || 0.01;
             this.network.setOptimizer(this.optimizerName, this.learningRate);
+        });
+
+        // Loss function select
+        document.getElementById('loss-select').addEventListener('change', (e) => {
+            this.lossFunctionName = e.target.value;
+            // Loss function is used in training loop
+        });
+
+        // Weight init select
+        document.getElementById('init-select').addEventListener('change', (e) => {
+            this.weightInitName = e.target.value;
+            // Applied on next reset
         });
 
         // Populate target function dropdown
@@ -241,7 +258,10 @@ class App {
         this.initNetwork();
         this.networkViz.setNetwork(this.network);
         this.curveViz.setNetwork(this.network);
+        this.calcPanel.setNetwork(this.network);
         this.lossChart.clear();
+        this.accuracyChart.clear();
+        this.accuracyHistory = [];
         this.updateAllVisualizers();
     }
 
@@ -299,7 +319,28 @@ class App {
         this.stop();
         this.network.reset();
         this.lossChart.clear();
+        this.accuracyChart.clear();
+        this.accuracyHistory = [];
+        this.calcPanel.setNetwork(this.network);
         this.updateAllVisualizers();
+    }
+
+    calculateAccuracy() {
+        if (!this.trainingInputs || !this.trainingTargets) return 0;
+
+        let totalError = 0;
+        const targetMin = Math.min(...this.trainingTargets);
+        const targetMax = Math.max(...this.trainingTargets);
+        const maxRange = Math.max(1, targetMax - targetMin);
+
+        for (let i = 0; i < this.trainingInputs.length; i++) {
+            const prediction = this.network.predict(this.trainingInputs[i]);
+            const target = this.trainingTargets[i];
+            totalError += Math.abs(prediction - target);
+        }
+
+        const avgError = totalError / this.trainingInputs.length;
+        return Math.max(0, (1 - avgError / maxRange) * 100);
     }
 
     updateAllVisualizers() {
@@ -312,20 +353,22 @@ class App {
             : 0;
         document.getElementById('current-loss').textContent = `Loss: ${currentLoss.toFixed(6)}`;
 
+        // Calculate and track accuracy
+        const accuracy = this.calculateAccuracy();
+        if (this.network.epoch > 0) {
+            this.accuracyHistory.push(accuracy);
+        }
+        document.getElementById('current-accuracy').textContent = `${accuracy.toFixed(2)}%`;
+
         // Update weight count
         const stats = this.network.getWeightStats();
         document.getElementById('weight-count').textContent = `${stats.count} weights`;
-
-        // Update weight stats
-        document.getElementById('min-weight').textContent = stats.min.toFixed(4);
-        document.getElementById('max-weight').textContent = stats.max.toFixed(4);
-        document.getElementById('avg-weight').textContent = stats.avg.toFixed(4);
-        document.getElementById('avg-gradient').textContent = stats.gradientAvg.toFixed(6);
 
         // Render visualizations
         this.networkViz.render();
         this.curveViz.render();
         this.lossChart.update(this.network.lossHistory);
+        this.accuracyChart.update(this.accuracyHistory);
         this.calcPanel.update();
     }
 }

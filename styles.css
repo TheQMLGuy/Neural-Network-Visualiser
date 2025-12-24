@@ -741,3 +741,109 @@ body {
     justify-content: flex-end;
     gap: 8px;
 }
+
+/* Main Content - 4 panel layout */
+.main-content.resizable-grid {
+    grid-template-columns: 1fr 1.5fr;
+    grid-template-rows: 1fr 1fr;
+}
+
+.network-panel {
+    grid-row: span 2;
+}
+
+.accuracy-panel {
+    grid-column: 2;
+    grid-row: 2;
+}
+
+.accuracy-badge {
+    color: var(--success);
+    background: rgba(16, 185, 129, 0.2);
+}
+
+/* Observation Table Section */
+.observations-section {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    margin-top: 8px;
+}
+
+.observations-section.collapsed .observations-content {
+    display: none;
+}
+
+.observations-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px;
+    cursor: pointer;
+    background: var(--bg-secondary);
+}
+
+.observations-header h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.observations-content {
+    padding: 12px;
+    max-height: 300px;
+    overflow: auto;
+}
+
+.observations-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+}
+
+.observations-table th,
+.observations-table td {
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.observations-table th {
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.65rem;
+    letter-spacing: 0.5px;
+    position: sticky;
+    top: 0;
+}
+
+.observations-table td {
+    font-variant-numeric: tabular-nums;
+}
+
+.observations-table tr:hover td {
+    background: var(--bg-hover);
+}
+
+/* Flash animation for logging */
+@keyframes flash {
+    0% {
+        background: var(--success);
+    }
+
+    100% {
+        background: rgba(99, 102, 241, 0.2);
+    }
+}
+
+/* Loss badge - right-click hint */
+.loss-badge {
+    cursor: context-menu;
+}
+
+.loss-badge:hover::after {
+    content: ' 📋';
+}
