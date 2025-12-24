@@ -47,6 +47,174 @@ const ActivationFunctions = {
     linear: {
         fn: (x) => x,
         derivative: (x, output) => 1
+    },
+
+    // New activations
+    gelu: {
+        fn: (x) => 0.5 * x * (1 + Math.tanh(Math.sqrt(2 / Math.PI) * (x + 0.044715 * x * x * x))),
+        derivative: (x, output) => {
+            const cdf = 0.5 * (1 + Math.tanh(Math.sqrt(2 / Math.PI) * (x + 0.044715 * x * x * x)));
+            const pdf = Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
+            return cdf + x * pdf;
+        }
+    },
+
+    selu: {
+        fn: (x) => {
+            const alpha = 1.6732632423543772;
+            const scale = 1.0507009873554805;
+            return scale * (x > 0 ? x : alpha * (Math.exp(x) - 1));
+        },
+        derivative: (x, output) => {
+            const alpha = 1.6732632423543772;
+            const scale = 1.0507009873554805;
+            return scale * (x > 0 ? 1 : alpha * Math.exp(x));
+        }
+    },
+
+    mish: {
+        fn: (x) => x * Math.tanh(Math.log(1 + Math.exp(x))),
+        derivative: (x, output) => {
+            const sp = Math.log(1 + Math.exp(x));
+            const tsp = Math.tanh(sp);
+            const sig = 1 / (1 + Math.exp(-x));
+            return tsp + x * sig * (1 - tsp * tsp);
+        }
+    },
+
+    softplus: {
+        fn: (x) => Math.log(1 + Math.exp(Math.min(20, x))),
+        derivative: (x, output) => 1 / (1 + Math.exp(-x))
+    },
+
+    softsign: {
+        fn: (x) => x / (1 + Math.abs(x)),
+        derivative: (x, output) => 1 / Math.pow(1 + Math.abs(x), 2)
+    },
+
+    prelu: {
+        fn: (x) => x > 0 ? x : 0.25 * x, // alpha = 0.25
+        derivative: (x, output) => x > 0 ? 1 : 0.25
+    },
+
+    celu: {
+        fn: (x) => x > 0 ? x : 1.0 * (Math.exp(x / 1.0) - 1),
+        derivative: (x, output) => x > 0 ? 1 : Math.exp(x / 1.0)
+    }
+};
+
+// ============================================
+// LOSS FUNCTIONS
+// ============================================
+
+const LossFunctions = {
+    mse: {
+        name: 'Mean Squared Error',
+        fn: (predicted, target) => (predicted - target) ** 2,
+        derivative: (predicted, target) => 2 * (predicted - target)
+    },
+    mae: {
+        name: 'Mean Absolute Error',
+        fn: (predicted, target) => Math.abs(predicted - target),
+        derivative: (predicted, target) => predicted > target ? 1 : -1
+    },
+    huber: {
+        name: 'Huber Loss',
+        fn: (predicted, target) => {
+            const delta = 1.0;
+            const error = Math.abs(predicted - target);
+            return error <= delta
+                ? 0.5 * error * error
+                : delta * (error - 0.5 * delta);
+        },
+        derivative: (predicted, target) => {
+            const delta = 1.0;
+            const error = predicted - target;
+            return Math.abs(error) <= delta
+                ? error
+                : delta * Math.sign(error);
+        }
+    },
+    log_cosh: {
+        name: 'Log-Cosh Loss',
+        fn: (predicted, target) => Math.log(Math.cosh(predicted - target)),
+        derivative: (predicted, target) => Math.tanh(predicted - target)
+    },
+    quantile: {
+        name: 'Quantile Loss (0.5)',
+        fn: (predicted, target) => {
+            const q = 0.5;
+            const error = target - predicted;
+            return error >= 0 ? q * error : (q - 1) * error;
+        },
+        derivative: (predicted, target) => {
+            const q = 0.5;
+            return target >= predicted ? -q : (1 - q);
+        }
+    },
+    smooth_l1: {
+        name: 'Smooth L1',
+        fn: (predicted, target) => {
+            const error = Math.abs(predicted - target);
+            return error < 1 ? 0.5 * error * error : error - 0.5;
+        },
+        derivative: (predicted, target) => {
+            const error = predicted - target;
+            return Math.abs(error) < 1 ? error : Math.sign(error);
+        }
+    }
+};
+
+// ============================================
+// WEIGHT INITIALIZATION METHODS
+// ============================================
+
+const WeightInitializers = {
+    xavier: {
+        name: 'Xavier/Glorot',
+        init: (inputSize, outputSize) => {
+            const limit = Math.sqrt(6 / (inputSize + outputSize));
+            return (Math.random() * 2 - 1) * limit;
+        }
+    },
+    he: {
+        name: 'He (for ReLU)',
+        init: (inputSize, outputSize) => {
+            const std = Math.sqrt(2 / inputSize);
+            return (Math.random() * 2 - 1) * std;
+        }
+    },
+    lecun: {
+        name: 'LeCun',
+        init: (inputSize, outputSize) => {
+            const std = Math.sqrt(1 / inputSize);
+            return (Math.random() * 2 - 1) * std;
+        }
+    },
+    uniform: {
+        name: 'Uniform [-1, 1]',
+        init: (inputSize, outputSize) => Math.random() * 2 - 1
+    },
+    normal: {
+        name: 'Normal (0, 0.1)',
+        init: (inputSize, outputSize) => {
+            // Box-Muller transform
+            const u1 = Math.random();
+            const u2 = Math.random();
+            return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2) * 0.1;
+        }
+    },
+    zeros: {
+        name: 'Zeros',
+        init: (inputSize, outputSize) => 0
+    },
+    ones: {
+        name: 'Ones',
+        init: (inputSize, outputSize) => 1
+    },
+    small_random: {
+        name: 'Small Random',
+        init: (inputSize, outputSize) => (Math.random() * 0.2 - 0.1)
     }
 };
 
@@ -751,5 +919,8 @@ class NeuralNetwork {
 // Export for use in other files
 window.NeuralNetwork = NeuralNetwork;
 window.ActivationFunctions = ActivationFunctions;
+window.LossFunctions = LossFunctions;
+window.WeightInitializers = WeightInitializers;
 window.TargetFunctions = TargetFunctions;
 window.TargetFunctionCategories = TargetFunctionCategories;
+window.Optimizers = Optimizers;
