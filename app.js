@@ -51,9 +51,6 @@ class App {
         this.curveViz.setNetwork(this.network);
         this.curveViz.setTargetFunction(this.targetFunctionName, TargetFunctions[this.targetFunctionName]);
         this.forwardPassGraph.setNetwork(this.network);
-
-        // Setup forward pass toggle
-        this.setupForwardPassToggle();
     }
 
     initTrainingData() {
@@ -165,8 +162,11 @@ class App {
         const select = document.getElementById('target-function');
         const fnNames = Object.keys(TargetFunctions);
 
-        // Update count display
-        document.getElementById('fn-count').textContent = `(${fnNames.length})`;
+        // Update count display if exists
+        const countEl = document.getElementById('fn-count');
+        if (countEl) {
+            countEl.textContent = `(${fnNames.length})`;
+        }
 
         select.innerHTML = '';
         fnNames.forEach(name => {
@@ -373,27 +373,6 @@ class App {
         this.lossChart.update(this.network.lossHistory);
         this.accuracyChart.update(this.accuracyHistory);
         this.forwardPassGraph.update();
-    }
-
-    setupForwardPassToggle() {
-        const section = document.getElementById('forward-pass-section');
-        const toggleBtn = document.getElementById('toggle-forward-pass');
-        const inputEl = document.getElementById('calc-input');
-        let isExpanded = false;
-
-        toggleBtn.addEventListener('click', () => {
-            isExpanded = !isExpanded;
-            section.classList.toggle('collapsed', !isExpanded);
-            toggleBtn.textContent = isExpanded ? '▲ Hide' : '▼ Show';
-            if (isExpanded) {
-                this.forwardPassGraph.resize();
-            }
-        });
-
-        inputEl.addEventListener('input', (e) => {
-            const val = parseFloat(e.target.value) || 0;
-            this.forwardPassGraph.setInputValue(val);
-        });
     }
 }
 

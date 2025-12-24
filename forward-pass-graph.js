@@ -1,6 +1,6 @@
 /**
- * Visual Forward Pass Graph
- * Renders forward pass as a visual graph with calculations shown in rectangular nodes
+ * Visual Forward Pass Graph - Compact with Magnifier
+ * Shows condensed network with calculations, double-click for magnifier
  */
 
 class ForwardPassGraph {
@@ -9,13 +9,16 @@ class ForwardPassGraph {
         this.ctx = this.canvas.getContext('2d');
         this.network = null;
         this.inputValue = 0.5;
+        this.magnifier = document.getElementById('magnifier');
+        this.nodePositions = [];
+        this.forwardData = null;
 
         // Colors
         this.colors = {
             bg: '#0a0a0f',
             node: '#1a1a2e',
             nodeStroke: '#6366f1',
-            edge: 'rgba(99, 102, 241, 0.6)',
+            edge: 'rgba(99, 102, 241, 0.5)',
             text: '#ffffff',
             textMuted: '#888',
             weight: '#ffc832',
@@ -24,11 +27,8 @@ class ForwardPassGraph {
             result: '#10b981'
         };
 
-        // Node dimensions
-        this.nodeWidth = 140;
-        this.nodeHeight = 70;
-
         this.setupResize();
+        this.setupEvents();
     }
 
     setupResize() {
@@ -37,26 +37,41 @@ class ForwardPassGraph {
         this.resize();
     }
 
+    setupEvents() {
+        // Double-click for magnifier
+        this.canvas.addEventListener('dblclick', (e) => this.showMagnifier(e));
+
+        // Click away to hide
+        document.addEventListener('click', (e) => {
+            if (!this.magnifier.contains(e.target) && e.target !== this.canvas) {
+                this.hideMagnifier();
+            }
+        });
+
+        // Input change
+        const inputEl = document.getElementById('calc-input');
+        if (inputEl) {
+            inputEl.addEventListener('input', (e) => {
+                this.inputValue = parseFloat(e.target.value) || 0;
+                this.render();
+            });
+        }
+    }
+
     resize() {
         const rect = this.canvas.parentElement.getBoundingClientRect();
         const dpr = window.devicePixelRatio || 1;
 
         this.canvas.width = rect.width * dpr;
         this.canvas.height = rect.height * dpr;
-
         this.ctx.scale(dpr, dpr);
         this.width = rect.width;
         this.height = rect.height;
-
         this.render();
     }
 
     setNetwork(network) {
         this.network = network;
-    }
-
-    setInputValue(value) {
-        this.inputValue = value;
         this.render();
     }
 
@@ -71,74 +86,106 @@ class ForwardPassGraph {
         ctx.clearRect(0, 0, this.width, this.height);
 
         // Calculate forward pass
-        const forwardData = this.calculateForwardPass();
+        this.forwardData = this.calculateForwardPass();
 
-        // Layout
+        // Layout - compact circles
         const numLayers = this.network.layerSizes.length;
-        const padding = 30;
-        const layerSpacing = (this.width - padding * 2) / (numLayers);
+        const padding = 20;
+        const layerSpacing = (this.width - padding * 2) / (numLayers - 1);
+        const nodeRadius = 16;
 
-        // Calculate node positions
-        const positions = [];
+        // Calculate positions
+        this.nodePositions = [];
         for (let l = 0; l < numLayers; l++) {
             const layerPositions = [];
             const numNodes = this.network.layerSizes[l];
-            const layerHeight = numNodes * (this.nodeHeight + 15) - 15;
+            const spacing = Math.min(40, (this.height - padding * 2) / Math.max(1, numNodes - 1));
+            const layerHeight = (numNodes - 1) * spacing;
             const startY = (this.height - layerHeight) / 2;
 
             for (let n = 0; n < numNodes; n++) {
                 layerPositions.push({
-                    x: padding + l * layerSpacing + layerSpacing / 2,
-                    y: startY + n * (this.nodeHeight + 15) + this.nodeHeight / 2
+                    x: padding + l * layerSpacing,
+                    y: startY + n * spacing,
+                    layer: l,
+                    node: n
                 });
             }
-            positions.push(layerPositions);
+            this.nodePositions.push(layerPositions);
         }
 
-        // Draw connections with multiplication labels
+        // Draw edges with weight labels
         for (let l = 0; l < numLayers - 1; l++) {
-            for (let fromNode = 0; fromNode < positions[l].length; fromNode++) {
-                for (let toNode = 0; toNode < positions[l + 1].length; toNode++) {
-                    const from = positions[l][fromNode];
-                    const to = positions[l + 1][toNode];
-                    const weight = this.network.weights[l][toNode][fromNode];
-                    const inputVal = forwardData.layerOutputs[l][fromNode];
+            for (let from = 0; from < this.nodePositions[l].length; from++) {
+                for (let to = 0; to < this.nodePositions[l + 1].length; to++) {
+                    const fromPos = this.nodePositions[l][from];
+                    const toPos = this.nodePositions[l + 1][to];
+                    const weight = this.network.weights[l][to][from];
 
-                    this.drawConnection(from, to, weight, inputVal);
+                    // Line
+                    ctx.beginPath();
+                    ctx.moveTo(fromPos.x + nodeRadius, fromPos.y);
+                    ctx.lineTo(toPos.x - nodeRadius, toPos.y);
+                    ctx.strokeStyle = this.colors.edge;
+                    ctx.lineWidth = Math.max(0.5, Math.min(2, Math.abs(weight)));
+                    ctx.stroke();
+
+                    // Weight on edge (small)
+                    const midX = (fromPos.x + toPos.x) / 2;
+                    const midY = (fromPos.y + toPos.y) / 2;
+                    ctx.font = '8px monospace';
+                    ctx.fillStyle = this.colors.weight;
+                    ctx.textAlign = 'center';
+                    ctx.fillText(weight.toFixed(1), midX, midY - 2);
                 }
             }
         }
 
         // Draw nodes
         for (let l = 0; l < numLayers; l++) {
-            for (let n = 0; n < positions[l].length; n++) {
-                const pos = positions[l][n];
+            for (let n = 0; n < this.nodePositions[l].length; n++) {
+                const pos = this.nodePositions[l][n];
+                const output = this.forwardData.layerOutputs[l][n];
 
-                if (l === 0) {
-                    // Input node
-                    this.drawInputNode(pos, forwardData.layerOutputs[0][n]);
-                } else if (l === numLayers - 1) {
-                    // Output node
-                    this.drawOutputNode(pos, forwardData.layerOutputs[l][n]);
-                } else {
-                    // Hidden node with full calculation
-                    const layerData = forwardData.layers[l - 1];
-                    const neuronData = layerData ? layerData.neurons[n] : null;
-                    this.drawHiddenNode(pos, neuronData, l, n);
-                }
+                // Circle
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, nodeRadius, 0, Math.PI * 2);
+                ctx.fillStyle = this.colors.node;
+                ctx.fill();
+                ctx.strokeStyle = l === 0 ? '#666' : (l === numLayers - 1 ? this.colors.result : this.colors.nodeStroke);
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Value inside
+                ctx.font = 'bold 10px monospace';
+                ctx.fillStyle = this.colors.text;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(output.toFixed(2), pos.x, pos.y);
             }
         }
+
+        // Labels
+        ctx.font = '9px Inter, sans-serif';
+        ctx.fillStyle = this.colors.textMuted;
+        ctx.textAlign = 'center';
+        ctx.fillText('Input', this.nodePositions[0][0].x, this.height - 8);
+        ctx.fillText('Output', this.nodePositions[numLayers - 1][0].x, this.height - 8);
+
+        // Hint text
+        ctx.font = '10px Inter, sans-serif';
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.textAlign = 'right';
+        ctx.fillText('Double-click node for details', this.width - 10, this.height - 8);
     }
 
     calculateForwardPass() {
         const nn = this.network;
         const x = this.inputValue;
         const activationFn = nn.activation.fn;
-        const activationName = nn.activationName;
 
         const result = {
             input: x,
-            activationName,
             layerOutputs: [[x]],
             layers: []
         };
@@ -162,16 +209,11 @@ class ForwardPassGraph {
 
                 const bias = nn.biases[l][n];
                 const preActivation = weightedSum + bias;
-                const output = l === nn.weights.length - 1 ? preActivation : activationFn(preActivation);
+                const isOutput = l === nn.weights.length - 1;
+                const output = isOutput ? preActivation : activationFn(preActivation);
 
                 nextInput.push(output);
-                layerResult.neurons.push({
-                    terms,
-                    weightedSum,
-                    bias,
-                    preActivation,
-                    output
-                });
+                layerResult.neurons.push({ terms, weightedSum, bias, preActivation, output, isOutput });
             }
 
             currentInput = nextInput;
@@ -182,131 +224,86 @@ class ForwardPassGraph {
         return result;
     }
 
-    drawConnection(from, to, weight, inputVal) {
-        const ctx = this.ctx;
-        const product = weight * inputVal;
+    showMagnifier(e) {
+        if (!this.forwardData) return;
 
-        // Calculate edge start/end to not overlap nodes
-        const startX = from.x + this.nodeWidth / 2 - 20;
-        const endX = to.x - this.nodeWidth / 2 + 20;
+        const rect = this.canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
 
-        // Line
-        ctx.beginPath();
-        ctx.moveTo(startX, from.y);
-        ctx.lineTo(endX, to.y);
-        ctx.strokeStyle = this.colors.edge;
-        ctx.lineWidth = Math.max(0.5, Math.min(3, Math.abs(weight)));
-        ctx.stroke();
+        // Find clicked node
+        let found = null;
+        for (let l = 0; l < this.nodePositions.length; l++) {
+            for (let n = 0; n < this.nodePositions[l].length; n++) {
+                const pos = this.nodePositions[l][n];
+                const dist = Math.sqrt((x - pos.x) ** 2 + (y - pos.y) ** 2);
+                if (dist < 20) {
+                    found = { layer: l, node: n };
+                    break;
+                }
+            }
+            if (found) break;
+        }
 
-        // Multiplication label at midpoint
-        const midX = (startX + endX) / 2;
-        const midY = (from.y + to.y) / 2;
+        if (!found) {
+            this.hideMagnifier();
+            return;
+        }
 
-        // Background for label
-        ctx.fillStyle = 'rgba(0,0,0,0.8)';
-        ctx.fillRect(midX - 35, midY - 10, 70, 20);
+        // Build magnifier content
+        let html = '';
 
-        // Label: "input × w = product"
-        ctx.font = '9px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = this.colors.weight;
-        ctx.fillText(`${inputVal.toFixed(2)}×${weight.toFixed(2)}`, midX, midY + 4);
+        if (found.layer === 0) {
+            html = `<div class="mag-title">Input Node</div>
+                    <div class="mag-row">Value: <span class="mag-result">${this.inputValue.toFixed(4)}</span></div>`;
+        } else {
+            const layerData = this.forwardData.layers[found.layer - 1];
+            const data = layerData.neurons[found.node];
+
+            html = `<div class="mag-title">Layer ${found.layer} - Node ${found.node}</div>`;
+
+            // Show weighted sum calculation
+            html += `<div class="mag-row"><strong>Weighted Sum:</strong></div>`;
+            data.terms.forEach((t, i) => {
+                html += `<div class="mag-row">&nbsp; <span class="mag-weight">${t.w.toFixed(3)}</span> × ${t.inp.toFixed(3)} = ${t.product.toFixed(4)}</div>`;
+            });
+            html += `<div class="mag-row">Σ = ${data.weightedSum.toFixed(4)}</div>`;
+
+            // Bias
+            html += `<div class="mag-row"><strong>+ Bias:</strong> <span class="mag-bias">${data.bias.toFixed(4)}</span></div>`;
+            html += `<div class="mag-row">Pre-activation: ${data.preActivation.toFixed(4)}</div>`;
+
+            // Activation
+            if (!data.isOutput) {
+                html += `<div class="mag-row"><span class="mag-activation">σ(${data.preActivation.toFixed(3)})</span> = <span class="mag-result">${data.output.toFixed(4)}</span></div>`;
+            } else {
+                html += `<div class="mag-row"><strong>Output:</strong> <span class="mag-result">${data.output.toFixed(4)}</span></div>`;
+            }
+        }
+
+        this.magnifier.innerHTML = html;
+        this.magnifier.classList.remove('hidden');
+
+        // Position magnifier
+        const magRect = this.magnifier.getBoundingClientRect();
+        let magX = e.clientX + 10;
+        let magY = e.clientY + 10;
+
+        // Keep in viewport
+        if (magX + magRect.width > window.innerWidth) {
+            magX = e.clientX - magRect.width - 10;
+        }
+        if (magY + magRect.height > window.innerHeight) {
+            magY = e.clientY - magRect.height - 10;
+        }
+
+        this.magnifier.style.left = magX + 'px';
+        this.magnifier.style.top = magY + 'px';
+        this.magnifier.style.position = 'fixed';
     }
 
-    drawInputNode(pos, value) {
-        const ctx = this.ctx;
-        const w = 60;
-        const h = 40;
-
-        // Rounded rect
-        ctx.beginPath();
-        ctx.roundRect(pos.x - w / 2, pos.y - h / 2, w, h, 8);
-        ctx.fillStyle = this.colors.node;
-        ctx.fill();
-        ctx.strokeStyle = this.colors.nodeStroke;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        // Label
-        ctx.font = 'bold 10px Inter, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = this.colors.textMuted;
-        ctx.fillText('INPUT', pos.x, pos.y - 5);
-
-        ctx.font = 'bold 14px monospace';
-        ctx.fillStyle = this.colors.text;
-        ctx.fillText(value.toFixed(2), pos.x, pos.y + 12);
-    }
-
-    drawOutputNode(pos, value) {
-        const ctx = this.ctx;
-        const w = 80;
-        const h = 50;
-
-        // Rounded rect with green stroke
-        ctx.beginPath();
-        ctx.roundRect(pos.x - w / 2, pos.y - h / 2, w, h, 8);
-        ctx.fillStyle = this.colors.node;
-        ctx.fill();
-        ctx.strokeStyle = this.colors.result;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        // Label
-        ctx.font = 'bold 10px Inter, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = this.colors.textMuted;
-        ctx.fillText('OUTPUT', pos.x, pos.y - 8);
-
-        ctx.font = 'bold 16px monospace';
-        ctx.fillStyle = this.colors.result;
-        ctx.fillText(value.toFixed(4), pos.x, pos.y + 12);
-    }
-
-    drawHiddenNode(pos, data, layerIndex, nodeIndex) {
-        const ctx = this.ctx;
-        const w = this.nodeWidth;
-        const h = this.nodeHeight;
-
-        if (!data) return;
-
-        // Rounded rect
-        ctx.beginPath();
-        ctx.roundRect(pos.x - w / 2, pos.y - h / 2, w, h, 8);
-        ctx.fillStyle = this.colors.node;
-        ctx.fill();
-        ctx.strokeStyle = this.colors.nodeStroke;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        // Line 1: Σ(w×x) = weightedSum
-        ctx.font = '9px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = this.colors.textMuted;
-        ctx.fillText(`Σ = ${data.weightedSum.toFixed(2)}`, pos.x, pos.y - 22);
-
-        // Line 2: Σ + bias = preActivation
-        const biasSign = data.bias >= 0 ? '+' : '';
-        ctx.fillStyle = this.colors.text;
-        ctx.fillText(`${data.weightedSum.toFixed(2)} ${biasSign} `, pos.x - 20, pos.y - 5);
-        ctx.fillStyle = this.colors.bias;
-        ctx.fillText(`${data.bias.toFixed(2)}`, pos.x + 15, pos.y - 5);
-        ctx.fillStyle = this.colors.text;
-        ctx.fillText(` = ${data.preActivation.toFixed(2)}`, pos.x + 40, pos.y - 5);
-
-        // Line 3: σ(preAct) = output
-        ctx.fillStyle = this.colors.activation;
-        ctx.fillText(`σ(${data.preActivation.toFixed(2)})`, pos.x - 15, pos.y + 12);
-        ctx.fillStyle = this.colors.text;
-        ctx.fillText('=', pos.x + 20, pos.y + 12);
-        ctx.fillStyle = this.colors.result;
-        ctx.font = 'bold 11px monospace';
-        ctx.fillText(`${data.output.toFixed(3)}`, pos.x + 45, pos.y + 12);
-
-        // Node label
-        ctx.font = '8px Inter, sans-serif';
-        ctx.fillStyle = this.colors.textMuted;
-        ctx.fillText(`H${layerIndex}[${nodeIndex}]`, pos.x, pos.y + 28);
+    hideMagnifier() {
+        this.magnifier.classList.add('hidden');
     }
 }
 

@@ -5,49 +5,120 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Neural Network Visualizer</title>
-    <meta name="description"
-        content="Interactive neural network visualizer with step-by-step backpropagation, multiple activation functions, and optimizers">
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 
 <body>
-    <div class="app-container">
-        <!-- Header -->
-        <header class="header">
-            <div class="logo">
-                <span class="logo-icon">🧠</span>
-                <h1>Neural Network Visualizer</h1>
-            </div>
-            <div class="epoch-display">
-                <span class="label">Epoch</span>
-                <span id="epoch-counter" class="value">0</span>
-            </div>
-        </header>
+    <div class="app-container three-column">
+        <!-- LEFT: Network Views -->
+        <aside class="left-panel">
+            <section class="panel network-panel">
+                <div class="panel-header compact">
+                    <h2>Network</h2>
+                    <span id="weight-count" class="badge">0 weights</span>
+                </div>
+                <div class="panel-body">
+                    <canvas id="network-canvas"></canvas>
+                    <div id="tooltip" class="tooltip"></div>
+                </div>
+            </section>
 
-        <!-- Controls Panel -->
-        <section class="controls-panel">
-            <div class="control-group">
-                <label>Architecture</label>
-                <div class="architecture-controls">
-                    <div class="layer-inputs" id="layer-inputs">
-                        <input type="number" class="layer-size" value="1" min="1" max="1" disabled
-                            title="Input layer (fixed)">
-                        <span class="arrow">→</span>
-                        <input type="number" class="layer-size" value="8" min="1" max="16">
-                        <span class="arrow">→</span>
-                        <input type="number" class="layer-size" value="8" min="1" max="16">
-                        <span class="arrow">→</span>
-                        <input type="number" class="layer-size" value="1" min="1" max="1" disabled
-                            title="Output layer (fixed)">
+            <section class="panel forward-pass-panel">
+                <div class="panel-header compact">
+                    <h2>Forward Pass</h2>
+                    <label class="input-label">
+                        x: <input type="number" id="calc-input" class="input input-xs" value="0.5" step="0.1" min="-1"
+                            max="1">
+                    </label>
+                </div>
+                <div class="panel-body">
+                    <canvas id="forward-pass-canvas"></canvas>
+                    <div id="magnifier" class="magnifier hidden"></div>
+                </div>
+            </section>
+        </aside>
+
+        <!-- MIDDLE: Graphs -->
+        <main class="middle-panel">
+            <section class="panel curve-panel">
+                <div class="panel-header compact">
+                    <h2>Curve Fitting</h2>
+                    <div class="header-right">
+                        <span class="legend-compact">
+                            <span class="dot target"></span>Target
+                            <span class="dot result"></span>Output
+                        </span>
+                        <button id="fullscreen-btn" class="btn btn-xs" title="Fullscreen">⛶</button>
                     </div>
-                    <button id="add-layer-btn" class="btn btn-sm" title="Add hidden layer">+</button>
-                    <button id="remove-layer-btn" class="btn btn-sm" title="Remove hidden layer">−</button>
+                </div>
+                <div class="panel-body">
+                    <canvas id="curve-canvas"></canvas>
+                </div>
+            </section>
+
+            <div class="metrics-row">
+                <section class="panel metric-panel">
+                    <div class="panel-header compact">
+                        <h2>Loss</h2>
+                        <span id="current-loss" class="badge loss-badge" title="Right-click to log">0.0000</span>
+                    </div>
+                    <div class="panel-body">
+                        <canvas id="loss-canvas"></canvas>
+                    </div>
+                </section>
+
+                <section class="panel metric-panel">
+                    <div class="panel-header compact">
+                        <h2>Accuracy</h2>
+                        <span id="current-accuracy" class="badge accuracy-badge">0.00%</span>
+                    </div>
+                    <div class="panel-body">
+                        <canvas id="accuracy-canvas"></canvas>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Training controls at bottom of middle -->
+            <div class="training-bar">
+                <div class="epoch-badge">
+                    Epoch <span id="epoch-counter">0</span>
+                </div>
+                <button id="play-btn" class="btn btn-primary">▶ Play</button>
+                <button id="step-btn" class="btn">⏭ Step</button>
+                <button id="reset-btn" class="btn btn-danger">↺ Reset</button>
+                <button id="add-observation" class="btn btn-success" title="Log observation">+</button>
+                <button id="open-observations" class="btn" title="View observations">
+                    📋 <span id="obs-count">0</span>
+                </button>
+            </div>
+        </main>
+
+        <!-- RIGHT: Parameters -->
+        <aside class="right-panel">
+            <div class="params-header">
+                <span>Parameters</span>
+            </div>
+
+            <div class="param-group">
+                <label>Architecture</label>
+                <div class="layer-inputs" id="layer-inputs">
+                    <input type="number" class="layer-size" value="1" min="1" max="1" disabled>
+                    <span>→</span>
+                    <input type="number" class="layer-size" value="8" min="1" max="16">
+                    <span>→</span>
+                    <input type="number" class="layer-size" value="8" min="1" max="16">
+                    <span>→</span>
+                    <input type="number" class="layer-size" value="1" min="1" max="1" disabled>
+                </div>
+                <div class="layer-btns">
+                    <button id="add-layer-btn" class="btn btn-xs">+ Layer</button>
+                    <button id="remove-layer-btn" class="btn btn-xs">− Layer</button>
                 </div>
             </div>
 
-            <div class="control-group">
-                <label for="activation-select">Activation</label>
+            <div class="param-group">
+                <label>Activation</label>
                 <select id="activation-select" class="select">
                     <option value="sigmoid">Sigmoid</option>
                     <option value="tanh">Tanh</option>
@@ -58,26 +129,21 @@
                     <option value="gelu">GELU</option>
                     <option value="selu">SELU</option>
                     <option value="mish">Mish</option>
-                    <option value="softplus">Softplus</option>
-                    <option value="softsign">Softsign</option>
-                    <option value="prelu">PReLU</option>
-                    <option value="celu">CELU</option>
                 </select>
             </div>
 
-            <div class="control-group">
-                <label for="loss-select">Loss Function</label>
+            <div class="param-group">
+                <label>Loss Function</label>
                 <select id="loss-select" class="select">
-                    <option value="mse" selected>MSE</option>
+                    <option value="mse">MSE</option>
                     <option value="mae">MAE</option>
                     <option value="huber">Huber</option>
                     <option value="log_cosh">Log-Cosh</option>
-                    <option value="smooth_l1">Smooth L1</option>
                 </select>
             </div>
 
-            <div class="control-group">
-                <label for="optimizer-select">Optimizer</label>
+            <div class="param-group">
+                <label>Optimizer</label>
                 <select id="optimizer-select" class="select">
                     <option value="sgd">SGD</option>
                     <option value="momentum">Momentum</option>
@@ -88,161 +154,74 @@
                 </select>
             </div>
 
-            <div class="control-group">
-                <label for="init-select">Weight Init</label>
+            <div class="param-group">
+                <label>Weight Init</label>
                 <select id="init-select" class="select">
                     <option value="xavier" selected>Xavier</option>
                     <option value="he">He</option>
                     <option value="lecun">LeCun</option>
                     <option value="uniform">Uniform</option>
                     <option value="normal">Normal</option>
-                    <option value="small_random">Small Random</option>
                 </select>
             </div>
 
-            <div class="control-group">
-                <label for="learning-rate">Learning Rate</label>
+            <div class="param-group">
+                <label>Learning Rate</label>
                 <input type="number" id="learning-rate" class="input" value="0.01" min="0.0001" max="1" step="0.001">
             </div>
 
-            <div class="control-group">
-                <label for="target-function">Target <span id="fn-count" class="fn-count">(100+)</span></label>
-                <div class="searchable-select">
-                    <input type="text" id="target-search" class="input" placeholder="Search..." autocomplete="off">
-                    <select id="target-function" class="select"></select>
-                </div>
+            <div class="param-group">
+                <label>Target Function</label>
+                <input type="text" id="target-search" class="input" placeholder="Search...">
+                <select id="target-function" class="select"></select>
             </div>
 
-            <div class="control-group">
-                <label for="step-size">Step Size</label>
-                <select id="step-size" class="select select-sm">
+            <div class="param-group">
+                <label>Step Size</label>
+                <select id="step-size" class="select">
                     <option value="1">1</option>
                     <option value="5" selected>5</option>
                     <option value="10">10</option>
                     <option value="50">50</option>
                     <option value="100">100</option>
                     <option value="500">500</option>
+                    <option value="1000">1000</option>
                 </select>
             </div>
+        </aside>
+    </div>
 
-            <div class="control-group training-controls">
-                <button id="play-btn" class="btn btn-primary">
-                    <span class="icon">▶</span> Play
-                </button>
-                <button id="step-btn" class="btn btn-secondary">
-                    <span class="icon">⏭</span> Step
-                </button>
-                <button id="reset-btn" class="btn btn-danger">
-                    <span class="icon">↺</span> Reset
-                </button>
-            </div>
-        </section>
-
-        <!-- Main Visualization Area -->
-        <main class="main-content resizable-grid">
-            <!-- Network Graph -->
-            <section class="panel network-panel resizable">
-                <div class="panel-header">
-                    <h2>Network Graph</h2>
-                    <span id="weight-count" class="badge">0 weights</span>
-                </div>
-                <div class="panel-body">
-                    <canvas id="network-canvas"></canvas>
-                    <div id="tooltip" class="tooltip"></div>
-                </div>
-            </section>
-
-            <!-- Curve Fitting -->
-            <section id="curve-panel" class="panel curve-panel resizable">
-                <div class="panel-header">
-                    <h2>Curve Fitting</h2>
-                    <div class="header-right">
-                        <div class="legend">
-                            <span class="legend-item target">┄ Target</span>
-                            <span class="legend-item activation">● σ(x)</span>
-                            <span class="legend-item weighted">● Weighted</span>
-                            <span class="legend-item result">● Result</span>
-                        </div>
-                        <button id="fullscreen-btn" class="btn btn-sm" title="Fullscreen">⛶</button>
-                    </div>
-                </div>
-                <div class="panel-body">
-                    <canvas id="curve-canvas"></canvas>
-                </div>
-            </section>
-
-            <!-- Loss Chart -->
-            <section class="panel loss-panel resizable">
-                <div class="panel-header">
-                    <h2>Loss</h2>
-                    <span id="current-loss" class="badge loss-badge" title="Right-click to log observation">Loss:
-                        0.0000</span>
-                </div>
-                <div class="panel-body">
-                    <canvas id="loss-canvas"></canvas>
-                </div>
-            </section>
-
-            <!-- Accuracy Chart -->
-            <section class="panel accuracy-panel resizable">
-                <div class="panel-header">
-                    <h2>Accuracy</h2>
-                    <span id="current-accuracy" class="badge accuracy-badge">0.00%</span>
-                </div>
-                <div class="panel-body">
-                    <canvas id="accuracy-canvas"></canvas>
-                </div>
-            </section>
-        </main>
-
-        <!-- Visual Forward Pass Graph -->
-        <section id="forward-pass-section" class="forward-pass-section collapsed">
-            <div class="forward-pass-header">
-                <h2>Forward Pass Visualization</h2>
-                <div class="header-right">
-                    <label class="input-label">
-                        Input x: <input type="number" id="calc-input" class="input input-xs" value="0.5" step="0.1"
-                            min="-1" max="1">
-                    </label>
-                    <button id="toggle-forward-pass" class="btn btn-sm">▼ Show</button>
+    <!-- Observations Modal -->
+    <div id="observations-modal" class="modal hidden">
+        <div class="modal-content modal-wide">
+            <div class="modal-header">
+                <h3>📋 Observation Log</h3>
+                <div class="modal-actions">
+                    <button id="export-csv" class="btn btn-primary btn-sm">📥 Export CSV</button>
+                    <button id="clear-observations" class="btn btn-danger btn-sm">Clear</button>
+                    <button id="close-observations" class="btn btn-sm">✕</button>
                 </div>
             </div>
-            <div class="forward-pass-content">
-                <canvas id="forward-pass-canvas"></canvas>
-            </div>
-        </section>
-
-        <!-- Observation Table -->
-        <section id="observations-section" class="observations-section collapsed">
-            <div class="observations-header">
-                <h2>Observation Table</h2>
-                <div class="header-right">
-                    <button id="export-observations" class="btn btn-sm">📥 Export CSV</button>
-                    <button id="clear-observations" class="btn btn-sm btn-danger">Clear</button>
-                    <button id="toggle-observations" class="btn btn-sm">▼ Show</button>
-                </div>
-            </div>
-            <div class="observations-content">
+            <div class="modal-body">
+                <p class="hint">Click + button to log current state</p>
                 <table id="observations-table" class="observations-table">
                     <thead>
                         <tr>
                             <th>#</th>
-                            <th>Hidden Layers</th>
-                            <th>Activation</th>
-                            <th>Loss Fn</th>
-                            <th>Optimizer</th>
-                            <th>Init</th>
+                            <th>Layers</th>
+                            <th>Act</th>
+                            <th>Loss</th>
+                            <th>Opt</th>
                             <th>LR</th>
                             <th>Epoch</th>
-                            <th>Loss</th>
-                            <th>Accuracy</th>
-                            <th>Timestamp</th>
+                            <th>Loss Val</th>
+                            <th>Acc</th>
                         </tr>
                     </thead>
                     <tbody id="observations-body"></tbody>
                 </table>
             </div>
-        </section>
+        </div>
     </div>
 
     <!-- Edit Modal -->
@@ -261,7 +240,7 @@
             </div>
             <div class="modal-footer">
                 <button id="modal-cancel" class="btn">Cancel</button>
-                <button id="modal-save" class="btn btn-primary">Save Initial</button>
+                <button id="modal-save" class="btn btn-primary">Save</button>
             </div>
         </div>
     </div>
