@@ -847,3 +847,41 @@ body {
 .loss-badge:hover::after {
     content: ' 📋';
 }
+
+/* Visual Forward Pass Section */
+.forward-pass-section {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    margin-top: 8px;
+}
+
+.forward-pass-section.collapsed .forward-pass-content {
+    display: none;
+}
+
+.forward-pass-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px;
+    cursor: pointer;
+    background: var(--bg-secondary);
+}
+
+.forward-pass-header h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.forward-pass-content {
+    height: 300px;
+    position: relative;
+}
+
+.forward-pass-content canvas {
+    width: 100% !important;
+    height: 100% !important;
+}

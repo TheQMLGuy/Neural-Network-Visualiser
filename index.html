@@ -195,29 +195,20 @@
             </section>
         </main>
 
-        <!-- Calculations Panel (collapsible) -->
-        <section id="calculations-section" class="calculations-section collapsed">
-            <div class="calculations-header">
-                <h2>Forward Pass Calculations</h2>
+        <!-- Visual Forward Pass Graph -->
+        <section id="forward-pass-section" class="forward-pass-section collapsed">
+            <div class="forward-pass-header">
+                <h2>Forward Pass Visualization</h2>
                 <div class="header-right">
                     <label class="input-label">
                         Input x: <input type="number" id="calc-input" class="input input-xs" value="0.5" step="0.1"
                             min="-1" max="1">
                     </label>
-                    <button id="toggle-calculations" class="btn btn-sm">▼ Show</button>
+                    <button id="toggle-forward-pass" class="btn btn-sm">▼ Show</button>
                 </div>
             </div>
-            <div class="calculations-content">
-                <div class="calc-columns">
-                    <div class="calc-column">
-                        <h3>Initial State</h3>
-                        <div id="calc-initial" class="calc-math"></div>
-                    </div>
-                    <div class="calc-column">
-                        <h3>Current State</h3>
-                        <div id="calc-current" class="calc-math"></div>
-                    </div>
-                </div>
+            <div class="forward-pass-content">
+                <canvas id="forward-pass-canvas"></canvas>
             </div>
         </section>
 
@@ -280,7 +271,7 @@
     <script src="network-visualizer.js"></script>
     <script src="curve-visualizer.js"></script>
     <script src="charts.js"></script>
-    <script src="calculations-panel.js"></script>
+    <script src="forward-pass-graph.js"></script>
     <script src="observations.js"></script>
     <script src="app.js"></script>
 </body>

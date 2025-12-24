@@ -44,13 +44,16 @@ class App {
         this.curveViz = new CurveVisualizer('curve-canvas');
         this.lossChart = new LossChart('loss-canvas');
         this.accuracyChart = new AccuracyChart('accuracy-canvas');
-        this.calcPanel = new CalculationsPanel();
+        this.forwardPassGraph = new ForwardPassGraph('forward-pass-canvas');
         this.observationsPanel = new ObservationsPanel();
 
         this.networkViz.setNetwork(this.network);
         this.curveViz.setNetwork(this.network);
         this.curveViz.setTargetFunction(this.targetFunctionName, TargetFunctions[this.targetFunctionName]);
-        this.calcPanel.setNetwork(this.network);
+        this.forwardPassGraph.setNetwork(this.network);
+
+        // Setup forward pass toggle
+        this.setupForwardPassToggle();
     }
 
     initTrainingData() {
@@ -258,7 +261,7 @@ class App {
         this.initNetwork();
         this.networkViz.setNetwork(this.network);
         this.curveViz.setNetwork(this.network);
-        this.calcPanel.setNetwork(this.network);
+        this.forwardPassGraph.setNetwork(this.network);
         this.lossChart.clear();
         this.accuracyChart.clear();
         this.accuracyHistory = [];
@@ -321,7 +324,7 @@ class App {
         this.lossChart.clear();
         this.accuracyChart.clear();
         this.accuracyHistory = [];
-        this.calcPanel.setNetwork(this.network);
+        this.forwardPassGraph.setNetwork(this.network);
         this.updateAllVisualizers();
     }
 
@@ -369,7 +372,28 @@ class App {
         this.curveViz.render();
         this.lossChart.update(this.network.lossHistory);
         this.accuracyChart.update(this.accuracyHistory);
-        this.calcPanel.update();
+        this.forwardPassGraph.update();
+    }
+
+    setupForwardPassToggle() {
+        const section = document.getElementById('forward-pass-section');
+        const toggleBtn = document.getElementById('toggle-forward-pass');
+        const inputEl = document.getElementById('calc-input');
+        let isExpanded = false;
+
+        toggleBtn.addEventListener('click', () => {
+            isExpanded = !isExpanded;
+            section.classList.toggle('collapsed', !isExpanded);
+            toggleBtn.textContent = isExpanded ? '▲ Hide' : '▼ Show';
+            if (isExpanded) {
+                this.forwardPassGraph.resize();
+            }
+        });
+
+        inputEl.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value) || 0;
+            this.forwardPassGraph.setInputValue(val);
+        });
     }
 }
 
