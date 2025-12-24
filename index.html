@@ -21,6 +21,15 @@
                 <div class="panel-body">
                     <canvas id="network-canvas"></canvas>
                     <div id="tooltip" class="tooltip"></div>
+                    <!-- Layer Controls Overlay -->
+                    <div id="layer-controls" class="layer-controls-overlay">
+                        <button id="add-layer-visual" class="ctrl-btn ctrl-add-layer"
+                            title="Add hidden layer">+L</button>
+                        <button id="remove-layer-visual" class="ctrl-btn ctrl-remove-layer"
+                            title="Remove hidden layer">−L</button>
+                    </div>
+                    <!-- Node controls rendered dynamically per layer -->
+                    <div id="node-controls-container"></div>
                 </div>
             </section>
 
@@ -37,11 +46,12 @@
                     <div id="magnifier" class="magnifier hidden"></div>
                 </div>
             </section>
+            <div class="resize-handle resize-left-mid" id="resize-left"></div>
         </aside>
 
         <!-- MIDDLE: Graphs -->
         <main class="middle-panel">
-            <section class="panel curve-panel">
+            <section id="curve-panel" class="panel curve-panel">
                 <div class="panel-header compact">
                     <h2>Curve Fitting</h2>
                     <div class="header-right">
@@ -100,22 +110,7 @@
                 <span>Parameters</span>
             </div>
 
-            <div class="param-group">
-                <label>Architecture</label>
-                <div class="layer-inputs" id="layer-inputs">
-                    <input type="number" class="layer-size" value="1" min="1" max="1" disabled>
-                    <span>→</span>
-                    <input type="number" class="layer-size" value="8" min="1" max="16">
-                    <span>→</span>
-                    <input type="number" class="layer-size" value="8" min="1" max="16">
-                    <span>→</span>
-                    <input type="number" class="layer-size" value="1" min="1" max="1" disabled>
-                </div>
-                <div class="layer-btns">
-                    <button id="add-layer-btn" class="btn btn-xs">+ Layer</button>
-                    <button id="remove-layer-btn" class="btn btn-xs">− Layer</button>
-                </div>
-            </div>
+            <!-- Architecture controls moved to visual interface -->
 
             <div class="param-group">
                 <label>Activation</label>
@@ -252,6 +247,7 @@
     <script src="charts.js"></script>
     <script src="forward-pass-graph.js"></script>
     <script src="observations.js"></script>
+    <script src="resizable.js"></script>
     <script src="app.js"></script>
 </body>
 

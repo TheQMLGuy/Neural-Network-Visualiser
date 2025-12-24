@@ -80,6 +80,8 @@ body {
     gap: 12px;
     min-height: 0;
     overflow: hidden;
+    position: relative;
+    /* Anchor for resize handle */
 }
 
 .left-panel .panel {
@@ -1048,9 +1050,10 @@ body {
 
 .observations-table th,
 .observations-table td {
-    padding: 8px 10px;
+    padding: 5px 6px;
     text-align: left;
     border-bottom: 1px solid var(--border-color);
+    font-size: 0.65rem;
 }
 
 .observations-table th {
@@ -1058,10 +1061,11 @@ body {
     color: var(--text-secondary);
     font-weight: 600;
     text-transform: uppercase;
-    font-size: 0.65rem;
-    letter-spacing: 0.5px;
+    font-size: 0.55rem;
+    letter-spacing: 0.3px;
     position: sticky;
     top: 0;
+    padding: 5px 6px;
 }
 
 .observations-table td {
@@ -1245,4 +1249,147 @@ body {
 
 .observations-table tr:hover td {
     background: var(--bg-hover);
+}
+
+/* Layer Controls Overlay */
+.layer-controls-overlay {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 10;
+}
+
+.ctrl-btn {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 0.7rem;
+    font-weight: 700;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ctrl-btn:hover {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: white;
+}
+
+.ctrl-add-layer {
+    color: var(--success);
+}
+
+.ctrl-remove-layer {
+    color: var(--danger);
+}
+
+.ctrl-divider {
+    width: 20px;
+    border: none;
+    border-top: 1px solid var(--border-color);
+    margin: 4px 4px;
+}
+
+.ctrl-add-node {
+    color: var(--success);
+    font-size: 0.65rem;
+}
+
+.ctrl-remove-node {
+    color: var(--danger);
+    font-size: 0.65rem;
+}
+
+/* Node controls - positioned dynamically */
+.node-control {
+    position: absolute;
+    display: flex;
+    gap: 2px;
+    z-index: 10;
+}
+
+.node-btn {
+    width: 18px;
+    height: 18px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: bold;
+    border-radius: 3px;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0;
+}
+
+.node-btn:hover {
+    background: var(--accent-primary);
+    color: white;
+}
+
+/* Resize Handles */
+.resize-handle {
+    position: absolute;
+    background: transparent;
+    z-index: 100;
+}
+
+.resize-handle-h {
+    width: 8px;
+    height: 100%;
+    cursor: col-resize;
+    top: 0;
+}
+
+.resize-handle-h:hover,
+.resize-handle-h.active {
+    background: var(--accent-primary);
+}
+
+.left-panel {
+    position: relative;
+}
+
+.middle-panel {
+    position: relative;
+}
+
+/* Resize handle between left and middle */
+.resize-left-mid {
+    position: absolute;
+    right: -4px;
+    top: 0;
+    width: 8px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: 100;
+}
+
+.resize-left-mid:hover {
+    background: linear-gradient(to right, transparent, var(--accent-primary), transparent);
+}
+
+/* Resize handle between middle and right */
+.resize-mid-right {
+    position: absolute;
+    left: -4px;
+    top: 0;
+    width: 8px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: 100;
+}
+
+.resize-mid-right:hover {
+    background: linear-gradient(to right, transparent, var(--accent-primary), transparent);
 }

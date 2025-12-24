@@ -38,10 +38,25 @@ class ForwardPassGraph {
     }
 
     setupEvents() {
-        // Double-click for magnifier
+        // Create tooltip element if needed
+        this.tooltip = document.getElementById('forward-pass-tooltip');
+        if (!this.tooltip) {
+            this.tooltip = document.createElement('div');
+            this.tooltip.id = 'forward-pass-tooltip';
+            this.tooltip.className = 'tooltip';
+            document.body.appendChild(this.tooltip);
+        }
+
+        // Hover for quick tooltip
+        this.canvas.addEventListener('mousemove', (e) => this.handleHover(e));
+        this.canvas.addEventListener('mouseleave', () => {
+            this.tooltip.classList.remove('visible');
+        });
+
+        // Double-click for full magnifier
         this.canvas.addEventListener('dblclick', (e) => this.showMagnifier(e));
 
-        // Click away to hide
+        // Click away to hide magnifier
         document.addEventListener('click', (e) => {
             if (!this.magnifier.contains(e.target) && e.target !== this.canvas) {
                 this.hideMagnifier();
@@ -56,6 +71,58 @@ class ForwardPassGraph {
                 this.render();
             });
         }
+    }
+
+    handleHover(e) {
+        if (!this.forwardData) return;
+
+        const rect = this.canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        // Find hovered node
+        let found = null;
+        for (let l = 0; l < this.nodePositions.length; l++) {
+            for (let n = 0; n < this.nodePositions[l].length; n++) {
+                const pos = this.nodePositions[l][n];
+                const dist = Math.sqrt((x - pos.x) ** 2 + (y - pos.y) ** 2);
+                if (dist < 20) {
+                    found = { layer: l, node: n };
+                    break;
+                }
+            }
+            if (found) break;
+        }
+
+        if (!found) {
+            this.tooltip.classList.remove('visible');
+            return;
+        }
+
+        // Build tooltip content
+        let html = '';
+        if (found.layer === 0) {
+            html = `<strong>Input</strong><br>Value: ${this.inputValue.toFixed(4)}`;
+        } else {
+            const layerData = this.forwardData.layers[found.layer - 1];
+            const data = layerData.neurons[found.node];
+            const delta = data.bias - (this.network.initialBiases[found.layer - 1]?.[found.node] ?? 0);
+            const deltaColor = delta >= 0 ? '#10b981' : '#ef4444';
+
+            html = `<strong>L${found.layer}N${found.node}</strong><br>`;
+            html += `Σ: ${data.weightedSum.toFixed(4)}<br>`;
+            html += `+b: <span style="color:#10b981">${data.bias.toFixed(4)}</span><br>`;
+            if (!data.isOutput) {
+                html += `σ() = <span style="color:#6366f1">${data.output.toFixed(4)}</span>`;
+            } else {
+                html += `Out: <span style="color:#10b981">${data.output.toFixed(4)}</span>`;
+            }
+        }
+
+        this.tooltip.innerHTML = html;
+        this.tooltip.style.left = (e.clientX + 10) + 'px';
+        this.tooltip.style.top = (e.clientY + 10) + 'px';
+        this.tooltip.classList.add('visible');
     }
 
     resize() {

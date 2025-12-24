@@ -115,11 +115,36 @@ Double-click any node or edge to edit its initial weight/bias value.
 4. **Robust to outliers**: Use Huber or Log-Cosh loss
 5. **Compare configs**: Log multiple observations to the table
 
+> ⚠️ **Curve Shape Warning**: The small Curve Fitting panel may distort the target function's appearance due to aspect ratio compression. **Use the fullscreen button (⛶)** to see the true shape of both the target and network output!
+
 ## 🛠️ Technologies
 
 - **Pure JavaScript** - No external dependencies
 - **Canvas API** - For all visualizations
 - **CSS3** - Modern styling with glassmorphism
+
+## ❓ FAQ
+
+### Why can it process 1000s of epochs per second?
+
+The visualizer is extremely fast because:
+
+1. **Tiny Network Size**  
+   A 1→8→8→1 network has only **80 weights + 16 biases**. Each epoch involves ~1000 floating-point operations.
+
+2. **Pure JavaScript Math**  
+   No DOM updates during the training loop—just array multiplication and addition in tight loops. Modern JS engines (V8, SpiderMonkey) JIT-compile this to near-native speed.
+
+3. **Batch Rendering with requestAnimationFrame**  
+   We only redraw the canvas ~60 times per second. Between frames, many epochs can complete. With step size 1000, you see results of 1000 epochs per visual update.
+
+4. **Small Dataset**  
+   Only 50-100 training points sampled from the target function. No file I/O, no data loading.
+
+5. **No GPU Overhead**  
+   For networks this small, CPU is actually faster than GPU due to data transfer overhead. GPU shines for networks with millions of parameters.
+
+**Real-world neural networks** with millions of parameters and millions of training examples take much longer—hours to weeks on specialized hardware!
 
 ## 📄 License
 

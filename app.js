@@ -26,8 +26,22 @@ class App {
         this.initControls();
         this.initTrainingData();
 
-        // Initial render
+        // Initial render with delay to ensure layout needs are met
         this.updateAllVisualizers();
+
+        // Force rebuild after short delay to fix node control positioning
+        setTimeout(() => {
+            this.networkViz.resize();
+            this.rebuildNetwork();
+        }, 100);
+
+        // Listen for resize events to update node controls
+        window.addEventListener('resize', () => {
+            if (this.networkViz) {
+                // Wait for layout to settle
+                setTimeout(() => this.renderNodeControls(), 50);
+            }
+        });
     }
 
     initNetwork() {
@@ -60,17 +74,15 @@ class App {
     }
 
     initControls() {
-        // Layer controls
-        this.layerInputsContainer = document.getElementById('layer-inputs');
-        document.getElementById('add-layer-btn').addEventListener('click', () => this.addLayer());
-        document.getElementById('remove-layer-btn').addEventListener('click', () => this.removeLayer());
-
-        // Listen for layer size changes
-        this.layerInputsContainer.addEventListener('change', (e) => {
-            if (e.target.classList.contains('layer-size')) {
-                this.updateLayerSizes();
-            }
-        });
+        // Visual layer controls (overlay on network canvas)
+        const addLayerVisual = document.getElementById('add-layer-visual');
+        const removeLayerVisual = document.getElementById('remove-layer-visual');
+        if (addLayerVisual) {
+            addLayerVisual.addEventListener('click', () => this.addLayer());
+        }
+        if (removeLayerVisual) {
+            removeLayerVisual.addEventListener('click', () => this.removeLayer());
+        }
 
         // Activation select
         document.getElementById('activation-select').addEventListener('change', (e) => {
@@ -205,18 +217,11 @@ class App {
         }, 50);
     }
 
-    updateLayerSizes() {
-        const inputs = this.layerInputsContainer.querySelectorAll('.layer-size');
-        this.layerSizes = Array.from(inputs).map(input => parseInt(input.value) || 1);
-        this.rebuildNetwork();
-    }
-
     addLayer() {
         if (this.layerSizes.length >= 6) return; // Max 6 layers
 
         // Insert new hidden layer before output
         this.layerSizes.splice(this.layerSizes.length - 1, 0, 8);
-        this.rebuildLayerInputs();
         this.rebuildNetwork();
     }
 
@@ -225,34 +230,69 @@ class App {
 
         // Remove last hidden layer
         this.layerSizes.splice(this.layerSizes.length - 2, 1);
-        this.rebuildLayerInputs();
         this.rebuildNetwork();
     }
 
-    rebuildLayerInputs() {
-        this.layerInputsContainer.innerHTML = '';
+    addNode(layerIndex) {
+        // Only modify hidden layers (index 1 to length-2)
+        if (layerIndex <= 0 || layerIndex >= this.layerSizes.length - 1) return;
+        if (this.layerSizes[layerIndex] >= 16) return; // Max 16 nodes
 
-        this.layerSizes.forEach((size, index) => {
-            if (index > 0) {
-                const arrow = document.createElement('span');
-                arrow.className = 'arrow';
-                arrow.textContent = '→';
-                this.layerInputsContainer.appendChild(arrow);
+        this.layerSizes[layerIndex]++;
+        this.rebuildNetwork();
+    }
+
+    removeNode(layerIndex) {
+        // Only modify hidden layers
+        if (layerIndex <= 0 || layerIndex >= this.layerSizes.length - 1) return;
+        if (this.layerSizes[layerIndex] <= 1) return; // Min 1 node
+
+        this.layerSizes[layerIndex]--;
+        this.rebuildNetwork();
+    }
+
+    renderNodeControls() {
+        const container = document.getElementById('node-controls-container');
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        // Wait for next frame to ensure visualizer has updated dimensions
+        requestAnimationFrame(() => {
+            if (!this.networkViz || !this.networkViz.width) return;
+
+            const padding = 80;
+            const width = this.networkViz.width;
+            const height = this.networkViz.height;
+            const layerCount = this.layerSizes.length;
+
+            // Loop through hidden layers only
+            for (let l = 1; l < layerCount - 1; l++) {
+                // Calculate X position matching network-visualizer logic
+                const x = padding + (l / (layerCount - 1)) * (width - padding * 2);
+
+                const controls = document.createElement('div');
+                controls.className = 'node-control';
+                controls.style.left = `${x}px`;
+                controls.style.bottom = '10px';
+                controls.style.transform = 'translateX(-50%)';
+
+                const addBtn = document.createElement('button');
+                addBtn.className = 'node-btn ctrl-add-node';
+                addBtn.textContent = '+';
+                addBtn.title = 'Add node';
+                addBtn.onclick = () => this.addNode(l);
+
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'node-btn ctrl-remove-node';
+                removeBtn.textContent = '-';
+                removeBtn.title = 'Remove node';
+                removeBtn.onclick = () => this.removeNode(l);
+
+                controls.appendChild(removeBtn);
+                controls.appendChild(addBtn);
+                container.appendChild(controls);
             }
-
-            const input = document.createElement('input');
-            input.type = 'number';
-            input.className = 'layer-size';
-            input.value = size;
-            input.min = 1;
-            input.max = index === 0 || index === this.layerSizes.length - 1 ? 1 : 16;
-
-            if (index === 0 || index === this.layerSizes.length - 1) {
-                input.disabled = true;
-                input.title = index === 0 ? 'Input layer (fixed)' : 'Output layer (fixed)';
-            }
-
-            this.layerInputsContainer.appendChild(input);
         });
     }
 
@@ -266,6 +306,7 @@ class App {
         this.accuracyChart.clear();
         this.accuracyHistory = [];
         this.updateAllVisualizers();
+        this.renderNodeControls();
     }
 
     togglePlay() {

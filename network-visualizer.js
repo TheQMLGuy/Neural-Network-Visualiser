@@ -20,8 +20,7 @@ class NetworkVisualizer {
         this.baseNodeRadius = 12;
         this.baseEdgeWidth = 1.5;
 
-        // Display options
-        this.showWeightLabels = true; // Show i:/c: on all edges
+        // Display options removed - just size and color now, hover for details
 
         // Colors
         this.colors = {
@@ -457,22 +456,6 @@ class NetworkVisualizer {
 
         ctx.stroke();
         ctx.globalAlpha = 1;
-
-        // Draw weight labels on ALL edges (not just hovered)
-        if (this.showWeightLabels || isHovered) {
-            const midX = (from.x + to.x) / 2;
-            const midY = (from.y + to.y) / 2;
-
-            // Calculate angle of edge for label positioning
-            const angle = Math.atan2(to.y - from.y, to.x - from.x);
-            const offsetX = Math.sin(angle) * 8;
-            const offsetY = -Math.cos(angle) * 8;
-
-            ctx.font = '7px Inter, monospace';
-            ctx.textAlign = 'center';
-            ctx.fillStyle = isHovered ? '#ffffff' : 'rgba(255,255,255,0.6)';
-            ctx.fillText(`${initialWeight.toFixed(1)}→${weight.toFixed(1)}`, midX + offsetX, midY + offsetY);
-        }
     }
 
     drawNode(layerIndex, nodeIndex) {
@@ -555,19 +538,7 @@ class NetworkVisualizer {
         ctx.lineWidth = isHovered ? 3 : 2;
         ctx.stroke();
 
-        // Draw bias values below node (skip input layer)
-        if (layerIndex > 0) {
-            ctx.font = '8px Inter, monospace';
-            ctx.textAlign = 'center';
 
-            // Initial bias (gray)
-            ctx.fillStyle = this.colors.textMuted;
-            ctx.fillText(`i:${initialBias.toFixed(2)}`, pos.x, pos.y + radius + 12);
-
-            // Current bias (colored by delta)
-            ctx.fillStyle = color;
-            ctx.fillText(`c:${currentBias.toFixed(2)}`, pos.x, pos.y + radius + 22);
-        }
 
         // Draw layer label for first node of each layer
         if (nodeIndex === 0) {
