@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neural Network Visualizer</title>
+    <meta name="description"
+        content="Interactive neural network visualizer with step-by-step backpropagation, multiple activation functions, and optimizers">
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <span class="logo-icon">🧠</span>
+                <h1>Neural Network Visualizer</h1>
+            </div>
+            <div class="epoch-display">
+                <span class="label">Epoch</span>
+                <span id="epoch-counter" class="value">0</span>
+            </div>
+        </header>
+
+        <!-- Controls Panel -->
+        <section class="controls-panel">
+            <div class="control-group">
+                <label>Architecture</label>
+                <div class="architecture-controls">
+                    <div class="layer-inputs" id="layer-inputs">
+                        <input type="number" class="layer-size" value="1" min="1" max="1" disabled
+                            title="Input layer (fixed)">
+                        <span class="arrow">→</span>
+                        <input type="number" class="layer-size" value="8" min="1" max="16">
+                        <span class="arrow">→</span>
+                        <input type="number" class="layer-size" value="8" min="1" max="16">
+                        <span class="arrow">→</span>
+                        <input type="number" class="layer-size" value="1" min="1" max="1" disabled
+                            title="Output layer (fixed)">
+                    </div>
+                    <button id="add-layer-btn" class="btn btn-sm" title="Add hidden layer">+</button>
+                    <button id="remove-layer-btn" class="btn btn-sm" title="Remove hidden layer">−</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label for="activation-select">Activation</label>
+                <select id="activation-select" class="select">
+                    <option value="sigmoid">Sigmoid</option>
+                    <option value="tanh">Tanh</option>
+                    <option value="relu">ReLU</option>
+                    <option value="leaky_relu">Leaky ReLU</option>
+                    <option value="elu">ELU</option>
+                    <option value="swish">Swish</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="optimizer-select">Optimizer</label>
+                <select id="optimizer-select" class="select">
+                    <option value="sgd">SGD</option>
+                    <option value="momentum">Momentum</option>
+                    <option value="rmsprop">RMSprop</option>
+                    <option value="adam" selected>Adam</option>
+                    <option value="adagrad">AdaGrad</option>
+                    <option value="nadam">Nadam</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="learning-rate">Learning Rate</label>
+                <input type="number" id="learning-rate" class="input" value="0.01" min="0.0001" max="1" step="0.001">
+            </div>
+
+            <div class="control-group">
+                <label for="target-function">Target Function <span id="fn-count" class="fn-count">(100+)</span></label>
+                <div class="searchable-select">
+                    <input type="text" id="target-search" class="input" placeholder="Search functions..."
+                        autocomplete="off">
+                    <select id="target-function" class="select"></select>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label for="step-size">Step Size</label>
+                <select id="step-size" class="select select-sm">
+                    <option value="1">1 epoch</option>
+                    <option value="5" selected>5 epochs</option>
+                    <option value="10">10 epochs</option>
+                    <option value="50">50 epochs</option>
+                    <option value="100">100 epochs</option>
+                    <option value="500">500 epochs</option>
+                </select>
+            </div>
+
+            <div class="control-group training-controls">
+                <button id="play-btn" class="btn btn-primary">
+                    <span class="icon">▶</span> Play
+                </button>
+                <button id="step-btn" class="btn btn-secondary">
+                    <span class="icon">⏭</span> Step
+                </button>
+                <button id="reset-btn" class="btn btn-danger">
+                    <span class="icon">↺</span> Reset
+                </button>
+            </div>
+        </section>
+
+        <!-- Main Visualization Area -->
+        <main class="main-content">
+            <!-- Network Graph -->
+            <section class="panel network-panel">
+                <div class="panel-header">
+                    <h2>Network Graph</h2>
+                    <span id="weight-count" class="badge">0 weights</span>
+                </div>
+                <div class="panel-body">
+                    <canvas id="network-canvas"></canvas>
+                    <div id="tooltip" class="tooltip"></div>
+                </div>
+            </section>
+
+            <!-- Curve Fitting -->
+            <section id="curve-panel" class="panel curve-panel">
+                <div class="panel-header">
+                    <h2>Curve Fitting</h2>
+                    <div class="header-right">
+                        <div class="legend">
+                            <span class="legend-item target">┄ Target</span>
+                            <span class="legend-item activation">● σ(x) Shape</span>
+                            <span class="legend-item weighted">● Weighted</span>
+                            <span class="legend-item result">● Result</span>
+                        </div>
+                        <button id="fullscreen-btn" class="btn btn-sm" title="Fullscreen">⛶</button>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <canvas id="curve-canvas"></canvas>
+                </div>
+            </section>
+
+            <!-- Training Info -->
+            <section class="panel loss-panel">
+                <div class="panel-header">
+                    <h2>Training Progress</h2>
+                    <span id="current-loss" class="badge loss-badge">Loss: 0.0000</span>
+                </div>
+                <div class="panel-body">
+                    <canvas id="loss-canvas"></canvas>
+                </div>
+            </section>
+
+            <!-- Weights Info -->
+            <section class="panel weights-panel">
+                <div class="panel-header">
+                    <h2>Weight Statistics</h2>
+                </div>
+                <div class="panel-body stats-grid">
+                    <div class="stat">
+                        <span class="stat-label">Min Weight</span>
+                        <span id="min-weight" class="stat-value">0.00</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Max Weight</span>
+                        <span id="max-weight" class="stat-value">0.00</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Avg |Weight|</span>
+                        <span id="avg-weight" class="stat-value">0.00</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Avg |Gradient|</span>
+                        <span id="avg-gradient" class="stat-value">0.00</span>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Calculations Panel (collapsible) -->
+        <section id="calculations-section" class="calculations-section collapsed">
+            <div class="calculations-header">
+                <h2>Forward Pass Calculations</h2>
+                <div class="header-right">
+                    <label class="input-label">
+                        Input x: <input type="number" id="calc-input" class="input input-xs" value="0.5" step="0.1"
+                            min="-1" max="1">
+                    </label>
+                    <button id="toggle-calculations" class="btn btn-sm">▼ Show</button>
+                </div>
+            </div>
+            <div class="calculations-content">
+                <div class="calc-columns">
+                    <div class="calc-column">
+                        <h3>Initial State</h3>
+                        <div id="calc-initial" class="calc-math"></div>
+                    </div>
+                    <div class="calc-column">
+                        <h3>Current State</h3>
+                        <div id="calc-current" class="calc-math"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="edit-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3 id="modal-title">Edit Value</h3>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Initial Value</label>
+                    <input type="number" id="edit-initial" class="input" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>Current Value</label>
+                    <input type="number" id="edit-current" class="input" step="0.01" disabled>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="modal-cancel" class="btn">Cancel</button>
+                <button id="modal-save" class="btn btn-primary">Save Initial</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="nn-engine.js"></script>
+    <script src="network-visualizer.js"></script>
+    <script src="curve-visualizer.js"></script>
+    <script src="charts.js"></script>
+    <script src="calculations-panel.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
