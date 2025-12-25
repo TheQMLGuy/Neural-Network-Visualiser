@@ -696,7 +696,8 @@ body {
 }
 
 /* Fullscreen panel */
-.curve-panel.fullscreen {
+/* Fullscreen panel - Generalized */
+.panel.fullscreen {
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
@@ -706,18 +707,56 @@ body {
     height: 100vh !important;
     z-index: 9999 !important;
     border-radius: 0 !important;
-    grid-column: 1 !important;
-    grid-row: 1 !important;
+    grid-column: 1 / -1 !important;
+    grid-row: 1 / -1 !important;
     background: var(--bg-primary) !important;
+    margin: 0 !important;
+    display: flex;
+    flex-direction: column;
 }
 
-.curve-panel.fullscreen .panel-body {
+.panel.fullscreen .panel-body {
     flex: 1;
+    max-height: none !important;
 }
 
-/* Fullscreen button active state */
-.curve-panel.fullscreen #fullscreen-btn {
+/* Modal Fullscreen */
+.modal-content.fullscreen {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: none !important;
+    max-height: none !important;
+    border-radius: 0 !important;
+    display: flex;
+    flex-direction: column;
+    z-index: 10000 !important;
+    /* Higher than modal overlay */
+    transform: none !important;
+    margin: 0 !important;
+}
+
+.modal-content.fullscreen .modal-body {
+    flex: 1;
+    max-height: none !important;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+/* Hide modal overlay when content is fullscreen */
+.modal:has(.modal-content.fullscreen) {
+    background: transparent !important;
+    padding: 0 !important;
+    display: block !important;
+}
+
+/* Fullscreen button active state in any panel */
+.panel.fullscreen .btn-fullscreen,
+.modal-content.fullscreen .btn-fullscreen {
     background: var(--accent-primary);
+    color: white;
 }
 
 /* Stats Grid */

@@ -146,18 +146,45 @@ class App {
             this.stepSize = parseInt(e.target.value) || 5;
         });
 
-        // Fullscreen toggle
-        document.getElementById('fullscreen-btn').addEventListener('click', () => {
-            this.toggleFullscreen();
-        });
+        // Fullscreen toggles
+        const fsCurve = document.getElementById('btn-fullscreen-curve');
+        if (fsCurve) {
+            fsCurve.addEventListener('click', () => this.toggleFullscreen('curve-panel'));
+        }
+
+        const fsNetwork = document.getElementById('btn-fullscreen-network');
+        if (fsNetwork) {
+            fsNetwork.addEventListener('click', () => this.toggleFullscreen('network-panel'));
+        }
+
+        const fsForward = document.getElementById('btn-fullscreen-forward');
+        if (fsForward) {
+            fsForward.addEventListener('click', () => this.toggleFullscreen('forward-pass-panel'));
+        }
+
+        const fsObs = document.getElementById('btn-fullscreen-obs');
+        if (fsObs) {
+            fsObs.addEventListener('click', () => this.toggleModalFullscreen('observations-modal'));
+        }
 
         // ESC key to exit fullscreen
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
-                const panel = document.getElementById('curve-panel');
-                if (panel.classList.contains('fullscreen')) {
-                    panel.classList.remove('fullscreen');
-                    this.curveViz.resize();
+                // Check for any fullscreen panel
+                const fullscreenPanel = document.querySelector('.panel.fullscreen');
+                if (fullscreenPanel) {
+                    this.toggleFullscreen(fullscreenPanel.id);
+                    return;
+                }
+
+                // Check for fullscreen modal content
+                const fullscreenModalContent = document.querySelector('.modal-content.fullscreen');
+                if (fullscreenModalContent) {
+                    const modal = fullscreenModalContent.closest('.modal');
+                    if (modal) {
+                        this.toggleModalFullscreen(modal.id);
+                        return;
+                    }
                 }
             }
         });
@@ -207,14 +234,33 @@ class App {
         select.size = 8;
     }
 
-    toggleFullscreen() {
-        const panel = document.getElementById('curve-panel');
+    toggleFullscreen(panelId) {
+        const panel = document.getElementById(panelId);
+        if (!panel) return;
+
         panel.classList.toggle('fullscreen');
 
-        // Trigger resize after toggling
+        // Trigger resize for all potential visualizers
         setTimeout(() => {
-            this.curveViz.resize();
+            if (this.curveViz) this.curveViz.resize();
+            if (this.networkViz) this.networkViz.resize();
+            if (this.forwardPassGraph) this.forwardPassGraph.resize();
+
+            // Re-render controls if network panel is resized
+            if (panelId === 'network-panel') {
+                this.renderNodeControls();
+            }
         }, 50);
+    }
+
+    toggleModalFullscreen(modalId) {
+        const modal = document.getElementById(modalId);
+        if (!modal) return;
+
+        const content = modal.querySelector('.modal-content');
+        if (content) {
+            content.classList.toggle('fullscreen');
+        }
     }
 
     addLayer() {
