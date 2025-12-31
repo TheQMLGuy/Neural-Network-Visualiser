@@ -765,19 +765,24 @@ class NeuralNetwork {
             current = postAct;
         }
 
-        return current[0];
+        // Return all outputs (supports multi-output)
+        return current;
     }
 
-    backward(input, target) {
-        const output = this.forward(input);
-        const error = output - target;
+    backward(input, targets) {
+        // targets can be a single value or array for multi-output
+        const targetArray = Array.isArray(targets) ? targets : [targets];
+        const outputs = this.forward(input);
+        
+        // Calculate errors for each output
+        const errors = outputs.map((out, i) => out - targetArray[i]);
 
         // Initialize gradient storage
         this.weightGradients = [];
         this.biasGradients = [];
 
-        // Output layer error
-        let deltas = [error]; // Linear output derivative is 1
+        // Output layer errors (linear output derivative is 1)
+        let deltas = errors;
 
         // Backpropagate
         for (let l = this.weights.length - 1; l >= 0; l--) {
@@ -829,7 +834,8 @@ class NeuralNetwork {
             );
         }
 
-        return error * error; // Return squared error
+        // Return sum of squared errors
+        return errors.reduce((sum, e) => sum + e * e, 0);
     }
 
     train(inputs, targets) {
@@ -848,6 +854,11 @@ class NeuralNetwork {
 
     predict(input) {
         return this.forward(input);
+    }
+
+    // Get number of outputs
+    getOutputCount() {
+        return this.layerSizes[this.layerSizes.length - 1];
     }
 
     getWeightStats() {

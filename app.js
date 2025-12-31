@@ -12,7 +12,11 @@ class App {
         this.lossFunctionName = 'mse';
         this.weightInitName = 'xavier';
         this.learningRate = 0.01;
-        this.targetFunctionName = 'sine';
+        this.targetFunctionName = 'sine'; // Legacy - for first output
+
+        // Multi-output function configuration
+        // Each output node has its own target function
+        this.outputFunctions = ['sine'];
 
         // Training state
         this.isPlaying = false;
@@ -39,7 +43,10 @@ class App {
         window.addEventListener('resize', () => {
             if (this.networkViz) {
                 // Wait for layout to settle
-                setTimeout(() => this.renderNodeControls(), 50);
+                setTimeout(() => {
+                    this.renderNodeControls();
+                    this.renderOutputControls();
+                }, 50);
             }
         });
     }
@@ -63,14 +70,131 @@ class App {
 
         this.networkViz.setNetwork(this.network);
         this.curveViz.setNetwork(this.network);
-        this.curveViz.setTargetFunction(this.targetFunctionName, TargetFunctions[this.targetFunctionName]);
+        this.updateCurveVizTargets();
         this.forwardPassGraph.setNetwork(this.network);
+    }
+
+    // Update curve visualizer with current output functions
+    updateCurveVizTargets() {
+        const targets = this.outputFunctions.map(name => ({
+            name,
+            fn: TargetFunctions[name]
+        }));
+        this.curveViz.setTargetFunctions(targets);
     }
 
     initTrainingData() {
         const data = this.curveViz.getTrainingData();
         this.trainingInputs = data.inputs;
         this.trainingTargets = data.targets;
+    }
+
+    // Add output node with default function
+    addOutputNode() {
+        const outputCount = this.layerSizes[this.layerSizes.length - 1];
+        if (outputCount >= 8) return; // Max 8 outputs
+
+        this.layerSizes[this.layerSizes.length - 1]++;
+        // Add default function for new output
+        this.outputFunctions.push('cosine');
+        this.rebuildNetwork();
+    }
+
+    // Remove last output node
+    removeOutputNode() {
+        const outputCount = this.layerSizes[this.layerSizes.length - 1];
+        if (outputCount <= 1) return; // Min 1 output
+
+        this.layerSizes[this.layerSizes.length - 1]--;
+        this.outputFunctions.pop();
+        this.rebuildNetwork();
+    }
+
+    // Set function for specific output
+    setOutputFunction(outputIndex, functionName) {
+        if (outputIndex >= 0 && outputIndex < this.outputFunctions.length) {
+            this.outputFunctions[outputIndex] = functionName;
+            // Keep legacy property in sync with first output
+            if (outputIndex === 0) {
+                this.targetFunctionName = functionName;
+            }
+            this.updateCurveVizTargets();
+            this.initTrainingData();
+            this.reset();
+        }
+    }
+
+    // Render output layer controls (add/remove buttons and function dropdowns)
+    renderOutputControls() {
+        const container = document.getElementById('output-controls-container');
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        requestAnimationFrame(() => {
+            if (!this.networkViz || !this.networkViz.width) return;
+
+            const padding = 80;
+            const width = this.networkViz.width;
+            const layerCount = this.layerSizes.length;
+            const outputCount = this.layerSizes[layerCount - 1];
+
+            // Position for output layer (rightmost)
+            const x = padding + ((layerCount - 1) / (layerCount - 1)) * (width - padding * 2);
+
+            // Add/Remove buttons for output layer
+            const controls = document.createElement('div');
+            controls.className = 'output-control';
+            controls.style.left = `${x}px`;
+            controls.style.bottom = '10px';
+            controls.style.transform = 'translateX(-50%)';
+
+            const addBtn = document.createElement('button');
+            addBtn.className = 'node-btn ctrl-add-node';
+            addBtn.textContent = '+';
+            addBtn.title = 'Add output node';
+            addBtn.onclick = () => this.addOutputNode();
+
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'node-btn ctrl-remove-node';
+            removeBtn.textContent = '-';
+            removeBtn.title = 'Remove output node';
+            removeBtn.onclick = () => this.removeOutputNode();
+
+            controls.appendChild(removeBtn);
+            controls.appendChild(addBtn);
+            container.appendChild(controls);
+
+            // Function dropdowns for each output node
+            const fnNames = Object.keys(TargetFunctions);
+            for (let i = 0; i < outputCount; i++) {
+                const nodeY = padding + ((i + 0.5) / outputCount) * (this.networkViz.height - padding * 2);
+
+                const dropdown = document.createElement('select');
+                dropdown.className = 'output-fn-select';
+                dropdown.style.position = 'absolute';
+                dropdown.style.left = `${x + 25}px`;
+                dropdown.style.top = `${nodeY}px`;
+                dropdown.style.transform = 'translateY(-50%)';
+                dropdown.title = `Output ${i + 1} target function`;
+
+                fnNames.forEach(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name.replace(/_/g, ' ');
+                    if (name === this.outputFunctions[i]) {
+                        option.selected = true;
+                    }
+                    dropdown.appendChild(option);
+                });
+
+                dropdown.addEventListener('change', (e) => {
+                    this.setOutputFunction(i, e.target.value);
+                });
+
+                container.appendChild(dropdown);
+            }
+        });
     }
 
     initControls() {
@@ -118,13 +242,10 @@ class App {
         // Populate target function dropdown
         this.populateFunctionDropdown();
 
-        // Target function select
+        // Target function select (applies to first output)
         const targetSelect = document.getElementById('target-function');
         targetSelect.addEventListener('change', (e) => {
-            this.targetFunctionName = e.target.value;
-            this.curveViz.setTargetFunction(this.targetFunctionName, TargetFunctions[this.targetFunctionName]);
-            this.initTrainingData();
-            this.reset();
+            this.setOutputFunction(0, e.target.value);
         });
 
         // Function search
@@ -347,12 +468,15 @@ class App {
         this.initNetwork();
         this.networkViz.setNetwork(this.network);
         this.curveViz.setNetwork(this.network);
+        this.updateCurveVizTargets();
         this.forwardPassGraph.setNetwork(this.network);
         this.lossChart.clear();
         this.accuracyChart.clear();
         this.accuracyHistory = [];
+        this.initTrainingData();
         this.updateAllVisualizers();
         this.renderNodeControls();
+        this.renderOutputControls();
     }
 
     togglePlay() {
@@ -418,18 +542,41 @@ class App {
     calculateAccuracy() {
         if (!this.trainingInputs || !this.trainingTargets) return 0;
 
+        const numOutputs = this.outputFunctions.length;
         let totalError = 0;
-        const targetMin = Math.min(...this.trainingTargets);
-        const targetMax = Math.max(...this.trainingTargets);
+        let totalCount = 0;
+
+        // Calculate min/max range across all outputs
+        let allTargets = [];
+        for (let i = 0; i < this.trainingTargets.length; i++) {
+            const target = this.trainingTargets[i];
+            if (Array.isArray(target)) {
+                allTargets.push(...target);
+            } else {
+                allTargets.push(target);
+            }
+        }
+        const targetMin = Math.min(...allTargets);
+        const targetMax = Math.max(...allTargets);
         const maxRange = Math.max(1, targetMax - targetMin);
 
         for (let i = 0; i < this.trainingInputs.length; i++) {
-            const prediction = this.network.predict(this.trainingInputs[i]);
-            const target = this.trainingTargets[i];
-            totalError += Math.abs(prediction - target);
+            const predictions = this.network.predict(this.trainingInputs[i]);
+            const targets = this.trainingTargets[i];
+
+            // Handle both single and multi-output
+            if (Array.isArray(targets)) {
+                for (let j = 0; j < targets.length; j++) {
+                    totalError += Math.abs(predictions[j] - targets[j]);
+                    totalCount++;
+                }
+            } else {
+                totalError += Math.abs(predictions[0] - targets);
+                totalCount++;
+            }
         }
 
-        const avgError = totalError / this.trainingInputs.length;
+        const avgError = totalError / totalCount;
         return Math.max(0, (1 - avgError / maxRange) * 100);
     }
 

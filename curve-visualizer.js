@@ -2,6 +2,7 @@
  * Curve Visualizer
  * Shows activation decomposition: single activation shape (red), 
  * weighted activations (yellow), and resultant curve (green)
+ * Supports multiple output functions with distinct colors
  */
 
 class CurveVisualizer {
@@ -10,8 +11,8 @@ class CurveVisualizer {
         this.ctx = this.canvas.getContext('2d');
 
         this.network = null;
-        this.targetFunction = null;
-        this.targetName = 'sine';
+        // Multi-output support: array of {name, fn} objects
+        this.targetFunctions = [{ name: 'sine', fn: TargetFunctions.sine }];
 
         // Data points for plotting
         this.plotPoints = [];
@@ -21,7 +22,17 @@ class CurveVisualizer {
         this.colors = {
             grid: 'rgba(255, 255, 255, 0.05)',
             axis: 'rgba(255, 255, 255, 0.2)',
-            target: 'rgba(255, 255, 255, 0.4)',
+            // Target curve colors (dashed lines)
+            targets: [
+                'rgba(255, 255, 255, 0.5)',
+                'rgba(200, 200, 255, 0.5)',
+                'rgba(255, 200, 200, 0.5)',
+                'rgba(200, 255, 200, 0.5)',
+                'rgba(255, 255, 200, 0.5)',
+                'rgba(200, 255, 255, 0.5)',
+                'rgba(255, 200, 255, 0.5)',
+                'rgba(220, 220, 220, 0.5)',
+            ],
             // Single red for activation function shape
             activation: '#ff6464',
             // Yellow shades for weighted activations
@@ -43,7 +54,17 @@ class CurveVisualizer {
                 'rgba(255, 195, 45, 0.6)',
                 'rgba(255, 205, 55, 0.6)',
             ],
-            result: '#10b981',
+            // Result curve colors (one per output)
+            results: [
+                '#10b981',  // Green
+                '#3b82f6',  // Blue
+                '#f59e0b',  // Amber
+                '#ef4444',  // Red
+                '#8b5cf6',  // Purple
+                '#06b6d4',  // Cyan
+                '#ec4899',  // Pink
+                '#84cc16',  // Lime
+            ],
             text: '#606070'
         };
 
@@ -81,9 +102,15 @@ class CurveVisualizer {
         this.network = network;
     }
 
+    // Legacy method for single target (backwards compatibility)
     setTargetFunction(name, fn) {
-        this.targetName = name;
-        this.targetFunction = fn;
+        this.targetFunctions = [{ name, fn }];
+        this.render();
+    }
+
+    // Multi-output support: set multiple target functions
+    setTargetFunctions(targets) {
+        this.targetFunctions = targets;
         this.render();
     }
 
@@ -119,8 +146,8 @@ class CurveVisualizer {
         this.drawGrid();
         this.drawAxes();
 
-        if (this.targetFunction) {
-            this.drawTargetCurve();
+        if (this.targetFunctions && this.targetFunctions.length > 0) {
+            this.drawTargetCurves();
         }
 
         if (this.network && this.network.layerSizes.length > 2) {
@@ -193,28 +220,46 @@ class CurveVisualizer {
         }
     }
 
-    drawTargetCurve() {
+    // Draw all target curves (dashed lines)
+    drawTargetCurves() {
         const ctx = this.ctx;
 
-        ctx.strokeStyle = this.colors.target;
-        ctx.lineWidth = 3;
-        ctx.setLineDash([8, 4]);
+        for (let t = 0; t < this.targetFunctions.length; t++) {
+            const target = this.targetFunctions[t];
+            if (!target.fn) continue;
 
-        ctx.beginPath();
+            ctx.strokeStyle = this.colors.targets[t % this.colors.targets.length];
+            ctx.lineWidth = 3;
+            // Vary dash patterns for different targets
+            const dashPatterns = [
+                [8, 4],
+                [12, 4],
+                [4, 4],
+                [16, 4],
+                [8, 8],
+                [4, 8],
+                [12, 8],
+                [6, 6],
+            ];
+            ctx.setLineDash(dashPatterns[t % dashPatterns.length]);
 
-        for (let i = 0; i < this.plotPoints.length; i++) {
-            const x = this.plotPoints[i];
-            const y = this.targetFunction(x);
-            const pos = this.toCanvas(x, y);
+            ctx.beginPath();
 
-            if (i === 0) {
-                ctx.moveTo(pos.x, pos.y);
-            } else {
-                ctx.lineTo(pos.x, pos.y);
+            for (let i = 0; i < this.plotPoints.length; i++) {
+                const x = this.plotPoints[i];
+                const y = target.fn(x);
+                const pos = this.toCanvas(x, y);
+
+                if (i === 0) {
+                    ctx.moveTo(pos.x, pos.y);
+                } else {
+                    ctx.lineTo(pos.x, pos.y);
+                }
             }
+
+            ctx.stroke();
         }
 
-        ctx.stroke();
         ctx.setLineDash([]);
     }
 
@@ -225,13 +270,18 @@ class CurveVisualizer {
         // Get the last hidden layer index
         const lastHiddenLayerIdx = nn.layerSizes.length - 2;
         const numHiddenNeurons = nn.layerSizes[lastHiddenLayerIdx];
-        const outputWeights = nn.weights[nn.weights.length - 1][0]; // Weights to output neuron
-        const outputBias = nn.biases[nn.biases.length - 1][0];
+        const numOutputs = nn.layerSizes[nn.layerSizes.length - 1];
+        const outputWeights = nn.weights[nn.weights.length - 1]; // [outputIdx][hiddenIdx]
+        const outputBiases = nn.biases[nn.biases.length - 1];
 
-        // For each plot point, calculate individual neuron contributions
-        const weightedCurves = [];   // Weighted contributions
-        const resultCurve = [];      // Final combined output
+        // For each output, calculate and store result curves
+        const resultCurves = [];
+        for (let o = 0; o < numOutputs; o++) {
+            resultCurves.push([]);
+        }
 
+        // For weighted curves (only show for first output to avoid clutter)
+        const weightedCurves = [];
         for (let i = 0; i < numHiddenNeurons; i++) {
             weightedCurves.push([]);
         }
@@ -240,39 +290,41 @@ class CurveVisualizer {
         for (let pIdx = 0; pIdx < this.plotPoints.length; pIdx++) {
             const x = this.plotPoints[pIdx];
 
-            // Do forward pass and store intermediate values
-            nn.forward(x);
+            // Do forward pass and get all outputs
+            const outputs = nn.forward(x);
 
             // Get activations from last hidden layer
             const hiddenActivations = nn.layerOutputs[lastHiddenLayerIdx];
 
-            let sum = outputBias;
+            // Calculate weighted curves (for first output only, for visualization clarity)
             for (let n = 0; n < numHiddenNeurons; n++) {
                 const act = hiddenActivations[n];
-                const weighted = act * outputWeights[n];
-
+                const weighted = act * outputWeights[0][n];
                 weightedCurves[n].push({ x, y: weighted });
-
-                sum += weighted;
             }
 
-            resultCurve.push({ x, y: sum });
+            // Store result for each output
+            for (let o = 0; o < numOutputs; o++) {
+                resultCurves[o].push({ x, y: outputs[o] });
+            }
         }
 
         // Draw SINGLE activation function shape (RED)
-        // This shows the raw activation function shape, not per-neuron
         this.drawActivationFunctionShape();
 
-        // Draw weighted curves (YELLOW) - one per neuron
+        // Draw weighted curves (YELLOW) - one per neuron (for first output)
         for (let n = 0; n < numHiddenNeurons; n++) {
             this.drawCurve(weightedCurves[n], this.colors.weighted[n % this.colors.weighted.length], 2, false);
         }
 
-        // Draw result curve (GREEN) with glow
-        ctx.shadowColor = this.colors.result;
-        ctx.shadowBlur = 15;
-        this.drawCurve(resultCurve, this.colors.result, 4, true);
-        ctx.shadowBlur = 0;
+        // Draw result curve for each output with glow
+        for (let o = 0; o < numOutputs; o++) {
+            const color = this.colors.results[o % this.colors.results.length];
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 15;
+            this.drawCurve(resultCurves[o], color, 4, true);
+            ctx.shadowBlur = 0;
+        }
     }
 
     // Draw the activation function shape (single red line)
@@ -335,9 +387,11 @@ class CurveVisualizer {
         ctx.stroke();
     }
 
-    // Get training data
+    // Get training data for multi-output
     getTrainingData() {
-        if (!this.targetFunction) return { inputs: [], targets: [] };
+        if (!this.targetFunctions || this.targetFunctions.length === 0) {
+            return { inputs: [], targets: [] };
+        }
 
         const trainingPoints = [];
         for (let i = 0; i < 30; i++) {
@@ -345,9 +399,20 @@ class CurveVisualizer {
             trainingPoints.push(x);
         }
 
+        const numOutputs = this.targetFunctions.length;
+        const targets = trainingPoints.map(x => {
+            if (numOutputs === 1) {
+                // Single output: return scalar for backwards compatibility
+                return this.targetFunctions[0].fn(x);
+            } else {
+                // Multi-output: return array
+                return this.targetFunctions.map(t => t.fn(x));
+            }
+        });
+
         return {
             inputs: trainingPoints,
-            targets: trainingPoints.map(x => this.targetFunction(x))
+            targets: targets
         };
     }
 }
