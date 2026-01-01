@@ -167,14 +167,13 @@ class AccuracyChart {
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext('2d');
 
-        this.trainHistory = [];
-        this.testHistory = [];
+        this.accuracyHistory = [];
         this.maxPoints = 500;
 
         this.colors = {
             grid: 'rgba(255, 255, 255, 0.05)',
-            train: '#f59e0b', // Orange for train
-            test: '#10b981',  // Green for test
+            line: '#10b981', // Green for accuracy
+            fill: 'rgba(16, 185, 129, 0.2)',
             text: '#606070'
         };
 
@@ -203,27 +202,17 @@ class AccuracyChart {
         this.render();
     }
 
-    update(trainHistory, testHistory) {
-        // Support both old single-array and new dual-array calls
-        if (Array.isArray(trainHistory) && testHistory === undefined) {
-            // Legacy: single array passed (treat as test)
-            this.testHistory = trainHistory.length > this.maxPoints
-                ? trainHistory.slice(-this.maxPoints)
-                : [...trainHistory];
+    update(accuracyHistory) {
+        if (accuracyHistory.length > this.maxPoints) {
+            this.accuracyHistory = accuracyHistory.slice(-this.maxPoints);
         } else {
-            this.trainHistory = trainHistory.length > this.maxPoints
-                ? trainHistory.slice(-this.maxPoints)
-                : [...trainHistory];
-            this.testHistory = testHistory.length > this.maxPoints
-                ? testHistory.slice(-this.maxPoints)
-                : [...testHistory];
+            this.accuracyHistory = [...accuracyHistory];
         }
         this.render();
     }
 
     clear() {
-        this.trainHistory = [];
-        this.testHistory = [];
+        this.accuracyHistory = [];
         this.render();
     }
 
@@ -235,16 +224,15 @@ class AccuracyChart {
 
         ctx.clearRect(0, 0, this.width, this.height);
 
-        const hasTrain = this.trainHistory.length >= 2;
-        const hasTest = this.testHistory.length >= 2;
-
-        if (!hasTrain && !hasTest) {
+        if (this.accuracyHistory.length < 2) {
             this.drawEmptyState();
             return;
         }
 
         const plotWidth = this.width - padding * 2;
         const plotHeight = this.height - padding * 2;
+
+        // Accuracy is 0-100%
         const maxAcc = 100;
         const minAcc = 0;
 
@@ -260,15 +248,38 @@ class AccuracyChart {
             ctx.stroke();
         }
 
-        // Draw train curve (orange)
-        if (hasTrain) {
-            this.drawCurve(this.trainHistory, this.colors.train, plotWidth, plotHeight, padding, maxAcc, minAcc);
+        // Draw accuracy curve
+        ctx.beginPath();
+
+        for (let i = 0; i < this.accuracyHistory.length; i++) {
+            const x = padding + (i / (this.accuracyHistory.length - 1)) * plotWidth;
+            const normalizedAcc = (this.accuracyHistory[i] - minAcc) / (maxAcc - minAcc);
+            const y = padding + (1 - normalizedAcc) * plotHeight;
+
+            if (i === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
         }
 
-        // Draw test curve (green)
-        if (hasTest) {
-            this.drawCurve(this.testHistory, this.colors.test, plotWidth, plotHeight, padding, maxAcc, minAcc);
-        }
+        ctx.strokeStyle = this.colors.line;
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+
+        // Fill under curve
+        const lastX = padding + plotWidth;
+        ctx.lineTo(lastX, padding + plotHeight);
+        ctx.lineTo(padding, padding + plotHeight);
+        ctx.closePath();
+
+        const gradient = ctx.createLinearGradient(0, padding, 0, padding + plotHeight);
+        gradient.addColorStop(0, 'rgba(16, 185, 129, 0.3)');
+        gradient.addColorStop(1, 'rgba(16, 185, 129, 0)');
+        ctx.fillStyle = gradient;
+        ctx.fill();
 
         // Y-axis labels (percentages)
         ctx.fillStyle = this.colors.text;
@@ -283,48 +294,10 @@ class AccuracyChart {
 
         // X-axis labels
         ctx.textAlign = 'center';
-        const epochCount = Math.max(this.trainHistory.length, this.testHistory.length);
+        const epochCount = this.accuracyHistory.length;
         ctx.fillText('0', padding, this.height - padding + 15);
         ctx.fillText(epochCount.toString(), this.width - padding, this.height - padding + 15);
-
-        // Legend
-        ctx.textAlign = 'left';
-        ctx.font = '9px Inter, sans-serif';
-        const legendX = padding + 5;
-        const legendY = padding + 12;
-
-        ctx.fillStyle = this.colors.train;
-        ctx.fillRect(legendX, legendY - 6, 12, 3);
-        ctx.fillStyle = this.colors.text;
-        ctx.fillText('Train', legendX + 16, legendY);
-
-        ctx.fillStyle = this.colors.test;
-        ctx.fillRect(legendX + 50, legendY - 6, 12, 3);
-        ctx.fillStyle = this.colors.text;
-        ctx.fillText('Test', legendX + 66, legendY);
-    }
-
-    drawCurve(history, color, plotWidth, plotHeight, padding, maxAcc, minAcc) {
-        const ctx = this.ctx;
-
-        ctx.beginPath();
-        for (let i = 0; i < history.length; i++) {
-            const x = padding + (i / (history.length - 1)) * plotWidth;
-            const normalizedAcc = (history[i] - minAcc) / (maxAcc - minAcc);
-            const y = padding + (1 - normalizedAcc) * plotHeight;
-
-            if (i === 0) {
-                ctx.moveTo(x, y);
-            } else {
-                ctx.lineTo(x, y);
-            }
-        }
-
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.stroke();
+        ctx.fillText('Epochs', this.width / 2, this.height - 5);
     }
 
     drawEmptyState() {

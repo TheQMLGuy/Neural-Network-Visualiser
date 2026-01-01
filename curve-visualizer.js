@@ -114,13 +114,6 @@ class CurveVisualizer {
         this.render();
     }
 
-    // Set noisy training data for visualization
-    setNoisyData(inputs, targets) {
-        this.noisyDataInputs = inputs;
-        this.noisyDataTargets = targets;
-        this.render();
-    }
-
     generatePlotPoints(count = 100) {
         this.plotPoints = [];
         for (let i = 0; i < count; i++) {
