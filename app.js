@@ -21,8 +21,19 @@ class App {
         // Training state
         this.isPlaying = false;
         this.animationId = null;
-        this.stepSize = 5;
-        this.accuracyHistory = [];
+        this.epochsToTrain = 1000;
+        this.currentEpoch = 0;
+        this.trainAccuracyHistory = [];
+        this.testAccuracyHistory = [];
+
+        // Noise configuration
+        this.noiseLevel = 0.1; // 10% default
+
+        // Training data (noisy for train, pure for test)
+        this.trainInputs = [];
+        this.trainTargets = []; // noisy
+        this.testInputs = [];
+        this.testTargets = []; // pure (no noise)
 
         // Initialize components
         this.initNetwork();
@@ -37,6 +48,8 @@ class App {
         setTimeout(() => {
             this.networkViz.resize();
             this.rebuildNetwork();
+            this.initMetricsUI();
+            this.renderExperimentsPanel();
         }, 100);
 
         // Listen for resize events to update node controls
@@ -63,7 +76,6 @@ class App {
     initVisualizers() {
         this.networkViz = new NetworkVisualizer('network-canvas', 'tooltip');
         this.curveViz = new CurveVisualizer('curve-canvas');
-        this.lossChart = new LossChart('loss-canvas');
         this.accuracyChart = new AccuracyChart('accuracy-canvas');
         this.forwardPassGraph = new ForwardPassGraph('forward-pass-canvas');
         this.observationsPanel = new ObservationsPanel();
@@ -85,8 +97,43 @@ class App {
 
     initTrainingData() {
         const data = this.curveViz.getTrainingData();
-        this.trainingInputs = data.inputs;
-        this.trainingTargets = data.targets;
+        const allInputs = data.inputs;
+        const pureTargets = data.targets;
+
+        // Generate noisy training data and pure test data
+        // Both use the same x values, but train has noise added to y
+        this.trainInputs = [...allInputs];
+        this.testInputs = [...allInputs];
+        this.testTargets = [...pureTargets]; // Pure function values
+
+        // Add noise to training targets
+        this.trainTargets = pureTargets.map(target => {
+            if (Array.isArray(target)) {
+                // Multi-output: add noise to each output
+                return target.map(t => this.addNoise(t));
+            } else {
+                return this.addNoise(target);
+            }
+        });
+
+        // Legacy compatibility
+        this.trainingInputs = this.trainInputs;
+        this.trainingTargets = this.trainTargets;
+    }
+
+    // Add Gaussian noise to a value
+    addNoise(value) {
+        // Box-Muller transform for Gaussian noise
+        const u1 = Math.random();
+        const u2 = Math.random();
+        const gaussian = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+        return value + gaussian * this.noiseLevel;
+    }
+
+    // Regenerate training data with current noise level
+    regenerateNoisyData() {
+        this.initTrainingData();
+        this.curveViz.setNoisyData(this.trainInputs, this.trainTargets);
     }
 
     // Add output node with default function
@@ -239,33 +286,25 @@ class App {
             // Applied on next reset
         });
 
-        // Populate target function dropdown
-        this.populateFunctionDropdown();
+        // Epochs count
+        const epochsInput = document.getElementById('epochs-count');
+        if (epochsInput) {
+            epochsInput.addEventListener('change', (e) => {
+                this.epochsToTrain = parseInt(e.target.value) || 1000;
+            });
+        }
 
-        // Target function select (applies to first output)
-        const targetSelect = document.getElementById('target-function');
-        targetSelect.addEventListener('change', (e) => {
-            this.setOutputFunction(0, e.target.value);
-        });
-
-        // Function search
-        const searchInput = document.getElementById('target-search');
-        searchInput.addEventListener('input', (e) => {
-            this.filterFunctions(e.target.value);
-        });
-        searchInput.addEventListener('focus', () => {
-            targetSelect.size = 8; // Expand dropdown
-        });
-        searchInput.addEventListener('blur', () => {
-            setTimeout(() => {
-                targetSelect.size = 1; // Collapse
-            }, 200);
-        });
-
-        // Step size
-        document.getElementById('step-size').addEventListener('change', (e) => {
-            this.stepSize = parseInt(e.target.value) || 5;
-        });
+        // Noise slider
+        const noiseSlider = document.getElementById('noise-slider');
+        const noiseValue = document.getElementById('noise-value');
+        if (noiseSlider) {
+            noiseSlider.addEventListener('input', (e) => {
+                const percent = parseInt(e.target.value);
+                this.noiseLevel = percent / 100;
+                if (noiseValue) noiseValue.textContent = percent + '%';
+                this.regenerateNoisyData();
+            });
+        }
 
         // Fullscreen toggles
         const fsCurve = document.getElementById('btn-fullscreen-curve');
@@ -519,59 +558,60 @@ class App {
 
     step() {
         // Train stepSize epochs on each step click
-        for (let i = 0; i < this.stepSize; i++) {
+        for (let i = 0; i < this.epochsToTrain; i++) {
             this.trainEpoch();
         }
         this.updateAllVisualizers();
     }
 
     trainEpoch() {
-        this.network.train(this.trainingInputs, this.trainingTargets);
+        // Train on noisy data
+        this.network.train(this.trainInputs, this.trainTargets);
     }
 
     reset() {
         this.stop();
+        this.currentEpoch = 0;
         this.network.reset();
-        this.lossChart.clear();
         this.accuracyChart.clear();
-        this.accuracyHistory = [];
+        this.trainAccuracyHistory = [];
+        this.testAccuracyHistory = [];
+        this.regenerateNoisyData();
         this.forwardPassGraph.setNetwork(this.network);
         this.updateAllVisualizers();
     }
 
-    calculateAccuracy() {
-        if (!this.trainingInputs || !this.trainingTargets) return 0;
+    // Calculate accuracy on given dataset
+    calculateAccuracyOnData(inputs, targets) {
+        if (!inputs || inputs.length === 0) return 0;
 
-        const numOutputs = this.outputFunctions.length;
         let totalError = 0;
         let totalCount = 0;
 
-        // Calculate min/max range across all outputs
-        let allTargets = [];
-        for (let i = 0; i < this.trainingTargets.length; i++) {
-            const target = this.trainingTargets[i];
+        // Get range for normalization
+        let allTargetValues = [];
+        for (const target of targets) {
             if (Array.isArray(target)) {
-                allTargets.push(...target);
+                allTargetValues.push(...target);
             } else {
-                allTargets.push(target);
+                allTargetValues.push(target);
             }
         }
-        const targetMin = Math.min(...allTargets);
-        const targetMax = Math.max(...allTargets);
+        const targetMin = Math.min(...allTargetValues);
+        const targetMax = Math.max(...allTargetValues);
         const maxRange = Math.max(1, targetMax - targetMin);
 
-        for (let i = 0; i < this.trainingInputs.length; i++) {
-            const predictions = this.network.predict(this.trainingInputs[i]);
-            const targets = this.trainingTargets[i];
+        for (let i = 0; i < inputs.length; i++) {
+            const predictions = this.network.predict(inputs[i]);
+            const target = targets[i];
 
-            // Handle both single and multi-output
-            if (Array.isArray(targets)) {
-                for (let j = 0; j < targets.length; j++) {
-                    totalError += Math.abs(predictions[j] - targets[j]);
+            if (Array.isArray(target)) {
+                for (let j = 0; j < target.length; j++) {
+                    totalError += Math.abs(predictions[j] - target[j]);
                     totalCount++;
                 }
             } else {
-                totalError += Math.abs(predictions[0] - targets);
+                totalError += Math.abs(predictions[0] - target);
                 totalCount++;
             }
         }
@@ -580,22 +620,38 @@ class App {
         return Math.max(0, (1 - avgError / maxRange) * 100);
     }
 
+    // Calculate train accuracy (on noisy data)
+    calculateTrainAccuracy() {
+        return this.calculateAccuracyOnData(this.trainInputs, this.trainTargets);
+    }
+
+    // Calculate test accuracy (on pure function)
+    calculateTestAccuracy() {
+        return this.calculateAccuracyOnData(this.testInputs, this.testTargets);
+    }
+
     updateAllVisualizers() {
         // Update epoch counter
         document.getElementById('epoch-counter').textContent = this.network.epoch;
 
-        // Update loss display
-        const currentLoss = this.network.lossHistory.length > 0
-            ? this.network.lossHistory[this.network.lossHistory.length - 1]
-            : 0;
-        document.getElementById('current-loss').textContent = `Loss: ${currentLoss.toFixed(6)}`;
+        // Calculate and display train/test accuracy
+        const trainAcc = this.calculateTrainAccuracy();
+        const testAcc = this.calculateTestAccuracy();
 
-        // Calculate and track accuracy
-        const accuracy = this.calculateAccuracy();
+        // Update history
         if (this.network.epoch > 0) {
-            this.accuracyHistory.push(accuracy);
+            this.trainAccuracyHistory.push(trainAcc);
+            this.testAccuracyHistory.push(testAcc);
         }
-        document.getElementById('current-accuracy').textContent = `${accuracy.toFixed(2)}%`;
+
+        // Update accuracy displays
+        const trainAccEl = document.getElementById('train-accuracy');
+        const testAccEl = document.getElementById('test-accuracy');
+        if (trainAccEl) trainAccEl.textContent = `${trainAcc.toFixed(2)}%`;
+        if (testAccEl) testAccEl.textContent = `${testAcc.toFixed(2)}%`;
+
+        // Update header accuracy (show test accuracy as main metric)
+        document.getElementById('current-accuracy').textContent = `${testAcc.toFixed(2)}%`;
 
         // Update weight count
         const stats = this.network.getWeightStats();
@@ -604,9 +660,205 @@ class App {
         // Render visualizations
         this.networkViz.render();
         this.curveViz.render();
-        this.lossChart.update(this.network.lossHistory);
-        this.accuracyChart.update(this.accuracyHistory);
+        this.accuracyChart.update(this.trainAccuracyHistory, this.testAccuracyHistory);
         this.forwardPassGraph.update();
+    }
+
+    // Evaluate metrics on a dataset
+    evaluateMetrics(inputs, targets) {
+        if (!inputs || inputs.length === 0) return null;
+
+        const predictions = inputs.map(x => this.network.predict(x));
+        return MetricsEngine.calculateAllMetrics(predictions, targets, 0.1);
+    }
+
+    // Update all metrics (train, val, test)
+    updateMetrics() {
+        if (typeof MetricsEngine === 'undefined') return;
+
+        // Calculate metrics for each split
+        this.trainMetrics = this.evaluateMetrics(this.trainInputs, this.trainTargets);
+        this.valMetrics = this.evaluateMetrics(this.valInputs, this.valTargets);
+        this.testMetrics = this.evaluateMetrics(this.testInputs, this.testTargets);
+
+        // Update metrics display if elements exist
+        this.updateMetricsDisplay();
+    }
+
+    // Update metrics UI display
+    updateMetricsDisplay() {
+        const updateElement = (id, value) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = value;
+        };
+
+        if (this.trainMetrics) {
+            updateElement('train-precision', (this.trainMetrics.precision * 100).toFixed(1) + '%');
+            updateElement('train-recall', (this.trainMetrics.recall * 100).toFixed(1) + '%');
+            updateElement('train-f1', (this.trainMetrics.f1 * 100).toFixed(1) + '%');
+            updateElement('train-r2', this.trainMetrics.r2.toFixed(4));
+            updateElement('train-mse', this.trainMetrics.mse.toFixed(6));
+        }
+
+        if (this.valMetrics) {
+            updateElement('val-precision', (this.valMetrics.precision * 100).toFixed(1) + '%');
+            updateElement('val-recall', (this.valMetrics.recall * 100).toFixed(1) + '%');
+            updateElement('val-f1', (this.valMetrics.f1 * 100).toFixed(1) + '%');
+            updateElement('val-r2', this.valMetrics.r2.toFixed(4));
+            updateElement('val-mse', this.valMetrics.mse.toFixed(6));
+        }
+
+        if (this.testMetrics) {
+            updateElement('test-precision', (this.testMetrics.precision * 100).toFixed(1) + '%');
+            updateElement('test-recall', (this.testMetrics.recall * 100).toFixed(1) + '%');
+            updateElement('test-f1', (this.testMetrics.f1 * 100).toFixed(1) + '%');
+            updateElement('test-r2', this.testMetrics.r2.toFixed(4));
+            updateElement('test-mse', this.testMetrics.mse.toFixed(6));
+        }
+
+        // Update confusion matrix display
+        if (this.trainMetrics && this.trainMetrics.confusionMatrix) {
+            const cm = this.trainMetrics.confusionMatrix;
+            updateElement('cm-tp', cm.tp);
+            updateElement('cm-fn', cm.fn);
+            updateElement('cm-fp', cm.fp);
+            updateElement('cm-tn', cm.tn);
+        }
+    }
+
+    // Load an experiment configuration
+    loadExperiment(experimentId) {
+        if (typeof ExperimentsLibrary === 'undefined') return;
+
+        const exp = ExperimentsLibrary.getById(experimentId);
+        if (!exp) return;
+
+        this.stop();
+
+        // Apply configuration
+        const config = exp.config;
+
+        if (config.layers) {
+            this.layerSizes = [...config.layers];
+            const numOutputs = config.layers[config.layers.length - 1];
+
+            // Set up output functions
+            if (Array.isArray(config.targetFn)) {
+                this.outputFunctions = [...config.targetFn];
+            } else {
+                this.outputFunctions = Array(numOutputs).fill(config.targetFn || 'sine');
+            }
+        }
+
+        if (config.activation) this.activationName = config.activation;
+        if (config.optimizer) this.optimizerName = config.optimizer;
+        if (config.lr) this.learningRate = config.lr;
+        if (config.loss) this.lossFunctionName = config.loss;
+        if (config.init) this.weightInitName = config.init;
+
+        // Rebuild with new config
+        this.rebuildNetwork();
+
+        // Show experiment info
+        console.log(`Loaded experiment: ${exp.name}`);
+        console.log(`Description: ${exp.description}`);
+        console.log(`Expected: ${exp.expectedBehavior}`);
+    }
+
+    // Render experiments panel
+    renderExperimentsPanel() {
+        const container = document.getElementById('experiments-list');
+        if (!container || typeof ExperimentsLibrary === 'undefined') return;
+
+        container.innerHTML = '';
+
+        const categories = ExperimentsLibrary.getCategories();
+
+        categories.forEach(category => {
+            const experiments = ExperimentsLibrary.getByCategory(category);
+
+            const categoryDiv = document.createElement('div');
+            categoryDiv.className = 'exp-category';
+
+            const header = document.createElement('div');
+            header.className = 'exp-category-header';
+            header.innerHTML = `<span>${category}</span> <span class="exp-count">(${experiments.length})</span>`;
+            header.onclick = () => categoryDiv.classList.toggle('collapsed');
+
+            const list = document.createElement('div');
+            list.className = 'exp-list';
+
+            experiments.forEach(exp => {
+                const item = document.createElement('div');
+                item.className = 'exp-item';
+                item.innerHTML = `<strong>${exp.name}</strong><p>${exp.description}</p>`;
+                item.onclick = () => this.loadExperiment(exp.id);
+                list.appendChild(item);
+            });
+
+            categoryDiv.appendChild(header);
+            categoryDiv.appendChild(list);
+            container.appendChild(categoryDiv);
+        });
+
+        // Update total count
+        const totalCount = document.querySelector('.exp-total-count');
+        if (totalCount) {
+            totalCount.textContent = `(${ExperimentsLibrary.getAll().length})`;
+        }
+    }
+
+    // Initialize metrics UI (tabs and search)
+    initMetricsUI() {
+        // Metrics tab switching
+        const tabs = document.querySelectorAll('.metrics-tab');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Remove active from all tabs and contents
+                tabs.forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.metrics-content').forEach(c => c.classList.remove('active'));
+
+                // Add active to clicked tab and corresponding content
+                tab.classList.add('active');
+                const tabName = tab.dataset.tab;
+                const content = document.getElementById(`metrics-${tabName}`);
+                if (content) content.classList.add('active');
+            });
+        });
+
+        // Experiment search
+        const searchInput = document.getElementById('exp-search');
+        if (searchInput && typeof ExperimentsLibrary !== 'undefined') {
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase();
+                const items = document.querySelectorAll('.exp-item');
+                const categories = document.querySelectorAll('.exp-category');
+
+                if (query === '') {
+                    // Show all
+                    items.forEach(item => item.style.display = '');
+                    categories.forEach(cat => {
+                        cat.style.display = '';
+                        cat.classList.remove('collapsed');
+                    });
+                } else {
+                    // Filter
+                    items.forEach(item => {
+                        const text = item.textContent.toLowerCase();
+                        item.style.display = text.includes(query) ? '' : 'none';
+                    });
+
+                    // Hide empty categories
+                    categories.forEach(cat => {
+                        const visibleItems = cat.querySelectorAll('.exp-item:not([style*="display: none"])');
+                        cat.style.display = visibleItems.length > 0 ? '' : 'none';
+                        if (visibleItems.length > 0) {
+                            cat.classList.remove('collapsed');
+                        }
+                    });
+                }
+            });
+        }
     }
 }
 
