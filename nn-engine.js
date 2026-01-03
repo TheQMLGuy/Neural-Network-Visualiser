@@ -736,10 +736,13 @@ class NeuralNetwork {
     }
 
     forward(input) {
-        this.layerOutputs = [[input]];
+        // Handle both scalar and array inputs
+        const inputArray = Array.isArray(input) ? input : [input];
+
+        this.layerOutputs = [inputArray];
         this.preActivations = [];
 
-        let current = [input];
+        let current = inputArray;
 
         for (let l = 0; l < this.weights.length; l++) {
             const preAct = [];
@@ -773,7 +776,7 @@ class NeuralNetwork {
         // targets can be a single value or array for multi-output
         const targetArray = Array.isArray(targets) ? targets : [targets];
         const outputs = this.forward(input);
-        
+
         // Calculate errors for each output
         const errors = outputs.map((out, i) => out - targetArray[i]);
 

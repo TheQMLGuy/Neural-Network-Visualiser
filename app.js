@@ -610,7 +610,356 @@ class App {
     }
 }
 
-// Initialize app when DOM is ready
+/**
+ * Classification Mode Application
+ */
+class ClassificationApp {
+    constructor() {
+        // Network configuration (2 inputs for x,y, 1 output for classification)
+        this.layerSizes = [2, 8, 8, 1];
+        this.activationName = 'tanh';
+        this.optimizerName = 'adam';
+        this.learningRate = 0.03;
+
+        // Training state
+        this.isPlaying = false;
+        this.animationId = null;
+        this.stepSize = 5;
+        this.accuracyHistory = [];
+
+        this.initNetwork();
+        this.initVisualizers();
+        this.initControls();
+
+        this.updateDisplay();
+
+        setTimeout(() => {
+            if (this.classificationViz) {
+                this.classificationViz.resize();
+            }
+            if (this.networkViz) {
+                this.networkViz.resize();
+                this.renderNodeControls();
+            }
+        }, 100);
+    }
+
+    initNetwork() {
+        this.network = new NeuralNetwork(
+            this.layerSizes,
+            this.activationName,
+            this.optimizerName,
+            this.learningRate
+        );
+    }
+
+    initVisualizers() {
+        this.networkViz = new NetworkVisualizer('cls-network-canvas', 'cls-tooltip');
+        this.classificationViz = new ClassificationVisualizer('classification-canvas');
+        this.lossChart = new LossChart('cls-loss-canvas');
+        this.accuracyChart = new AccuracyChart('cls-accuracy-canvas');
+
+        this.networkViz.setNetwork(this.network);
+        this.classificationViz.setNetwork(this.network);
+    }
+
+    initControls() {
+        // Dataset selector
+        document.getElementById('cls-dataset').addEventListener('change', (e) => {
+            this.classificationViz.generateDataset(e.target.value);
+            this.reset();
+        });
+
+        // Class selector
+        document.getElementById('cls-current-class').addEventListener('change', (e) => {
+            this.classificationViz.setCurrentClass(parseInt(e.target.value));
+        });
+
+        // Clear points
+        document.getElementById('cls-clear-points').addEventListener('click', () => {
+            this.classificationViz.clearPoints();
+            this.reset();
+        });
+
+        // Activation
+        document.getElementById('cls-activation-select').addEventListener('change', (e) => {
+            this.activationName = e.target.value;
+            this.network.setActivation(this.activationName);
+        });
+
+        // Optimizer
+        document.getElementById('cls-optimizer-select').addEventListener('change', (e) => {
+            this.optimizerName = e.target.value;
+            this.network.setOptimizer(this.optimizerName, this.learningRate);
+        });
+
+        // Learning rate
+        document.getElementById('cls-learning-rate').addEventListener('change', (e) => {
+            this.learningRate = parseFloat(e.target.value) || 0.03;
+            this.network.setOptimizer(this.optimizerName, this.learningRate);
+        });
+
+        // Step size
+        document.getElementById('cls-step-size').addEventListener('change', (e) => {
+            this.stepSize = parseInt(e.target.value) || 5;
+        });
+
+        // Training controls
+        this.playBtn = document.getElementById('cls-play-btn');
+        this.playBtn.addEventListener('click', () => this.togglePlay());
+        document.getElementById('cls-step-btn').addEventListener('click', () => this.step());
+        document.getElementById('cls-reset-btn').addEventListener('click', () => this.reset());
+
+        // Layer controls
+        document.getElementById('cls-add-layer').addEventListener('click', () => this.addLayer());
+        document.getElementById('cls-remove-layer').addEventListener('click', () => this.removeLayer());
+    }
+
+    addLayer() {
+        if (this.layerSizes.length >= 6) return;
+        this.layerSizes.splice(this.layerSizes.length - 1, 0, 4);
+        this.rebuildNetwork();
+    }
+
+    removeLayer() {
+        if (this.layerSizes.length <= 3) return;
+        this.layerSizes.splice(this.layerSizes.length - 2, 1);
+        this.rebuildNetwork();
+    }
+
+    addNode(layerIndex) {
+        if (layerIndex <= 0 || layerIndex >= this.layerSizes.length - 1) return;
+        if (this.layerSizes[layerIndex] >= 16) return;
+        this.layerSizes[layerIndex]++;
+        this.rebuildNetwork();
+    }
+
+    removeNode(layerIndex) {
+        if (layerIndex <= 0 || layerIndex >= this.layerSizes.length - 1) return;
+        if (this.layerSizes[layerIndex] <= 1) return;
+        this.layerSizes[layerIndex]--;
+        this.rebuildNetwork();
+    }
+
+    renderNodeControls() {
+        const container = document.getElementById('cls-node-controls-container');
+        if (!container) return;
+        container.innerHTML = '';
+
+        requestAnimationFrame(() => {
+            if (!this.networkViz || !this.networkViz.width) return;
+
+            const padding = 80;
+            const width = this.networkViz.width;
+            const layerCount = this.layerSizes.length;
+
+            for (let l = 1; l < layerCount - 1; l++) {
+                const x = padding + (l / (layerCount - 1)) * (width - padding * 2);
+
+                const controls = document.createElement('div');
+                controls.className = 'node-control';
+                controls.style.left = `${x}px`;
+                controls.style.bottom = '10px';
+                controls.style.transform = 'translateX(-50%)';
+
+                const addBtn = document.createElement('button');
+                addBtn.className = 'node-btn ctrl-add-node';
+                addBtn.textContent = '+';
+                addBtn.onclick = () => this.addNode(l);
+
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'node-btn ctrl-remove-node';
+                removeBtn.textContent = '-';
+                removeBtn.onclick = () => this.removeNode(l);
+
+                controls.appendChild(removeBtn);
+                controls.appendChild(addBtn);
+                container.appendChild(controls);
+            }
+        });
+    }
+
+    rebuildNetwork() {
+        this.stop();
+        this.initNetwork();
+        this.networkViz.setNetwork(this.network);
+        this.classificationViz.setNetwork(this.network);
+        this.lossChart.clear();
+        this.accuracyChart.clear();
+        this.accuracyHistory = [];
+        this.updateDisplay();
+        this.renderNodeControls();
+    }
+
+    togglePlay() {
+        if (this.isPlaying) {
+            this.stop();
+        } else {
+            this.play();
+        }
+    }
+
+    play() {
+        this.isPlaying = true;
+        this.playBtn.innerHTML = '⏸ Pause';
+        this.playBtn.classList.add('playing');
+        this.trainingLoop();
+    }
+
+    stop() {
+        this.isPlaying = false;
+        this.playBtn.innerHTML = '▶ Play';
+        this.playBtn.classList.remove('playing');
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+            this.animationId = null;
+        }
+    }
+
+    trainingLoop() {
+        if (!this.isPlaying) return;
+
+        for (let i = 0; i < this.stepSize; i++) {
+            this.trainEpoch();
+        }
+
+        this.updateDisplay();
+        this.animationId = requestAnimationFrame(() => this.trainingLoop());
+    }
+
+    step() {
+        for (let i = 0; i < this.stepSize; i++) {
+            this.trainEpoch();
+        }
+        this.updateDisplay();
+    }
+
+    trainEpoch() {
+        const data = this.classificationViz.getTrainingData();
+        if (data.inputs.length === 0) return;
+        this.network.train(data.inputs, data.targets);
+    }
+
+    reset() {
+        this.stop();
+        this.network.reset();
+        this.lossChart.clear();
+        this.accuracyChart.clear();
+        this.accuracyHistory = [];
+        this.updateDisplay();
+    }
+
+    updateDisplay() {
+        // Epoch counter
+        document.getElementById('cls-epoch-counter').textContent = this.network.epoch;
+
+        // Loss
+        const currentLoss = this.network.lossHistory.length > 0
+            ? this.network.lossHistory[this.network.lossHistory.length - 1]
+            : 0;
+        document.getElementById('cls-current-loss').textContent = currentLoss.toFixed(4);
+
+        // Accuracy
+        const accuracy = this.classificationViz.calculateAccuracy();
+        if (this.network.epoch > 0) {
+            this.accuracyHistory.push(accuracy);
+        }
+        document.getElementById('cls-current-accuracy').textContent = `${accuracy.toFixed(1)}%`;
+
+        // Weight count
+        const stats = this.network.getWeightStats();
+        document.getElementById('cls-weight-count').textContent = `${stats.count} weights`;
+
+        // Render visualizations
+        this.networkViz.render();
+        this.classificationViz.render();
+        this.lossChart.update(this.network.lossHistory);
+        this.accuracyChart.update(this.accuracyHistory);
+    }
+}
+
+/**
+ * Mode Controller - Handles navigation between modes
+ */
+class ModeController {
+    constructor() {
+        this.currentMode = 'landing';
+        this.regressionApp = null;
+        this.classificationApp = null;
+
+        this.setupEventListeners();
+    }
+
+    setupEventListeners() {
+        // Problem card clicks
+        document.querySelectorAll('.problem-card[data-mode]').forEach(card => {
+            card.addEventListener('click', () => {
+                const mode = card.getAttribute('data-mode');
+                if (mode) this.switchMode(mode);
+            });
+        });
+
+        // Back button
+        document.getElementById('back-to-home').addEventListener('click', () => {
+            this.switchMode('landing');
+        });
+    }
+
+    switchMode(mode) {
+        // Hide all
+        document.getElementById('landing-page').classList.add('hidden');
+        document.getElementById('mode-header').classList.add('hidden');
+        document.getElementById('regression-mode').classList.add('hidden');
+        document.getElementById('classification-mode').classList.add('hidden');
+
+        this.currentMode = mode;
+
+        if (mode === 'landing') {
+            document.getElementById('landing-page').classList.remove('hidden');
+        } else {
+            document.getElementById('mode-header').classList.remove('hidden');
+
+            if (mode === 'regression') {
+                document.getElementById('mode-title').textContent = 'Regression';
+                document.getElementById('regression-mode').classList.remove('hidden');
+
+                // Lazy init
+                if (!this.regressionApp) {
+                    this.regressionApp = new App();
+                } else {
+                    // Trigger resize for proper layout
+                    setTimeout(() => {
+                        if (this.regressionApp.networkViz) {
+                            this.regressionApp.networkViz.resize();
+                            this.regressionApp.renderNodeControls();
+                            this.regressionApp.renderOutputControls();
+                        }
+                    }, 50);
+                }
+            } else if (mode === 'classification') {
+                document.getElementById('mode-title').textContent = 'Classification';
+                document.getElementById('classification-mode').classList.remove('hidden');
+
+                // Lazy init
+                if (!this.classificationApp) {
+                    this.classificationApp = new ClassificationApp();
+                } else {
+                    setTimeout(() => {
+                        if (this.classificationApp.networkViz) {
+                            this.classificationApp.networkViz.resize();
+                            this.classificationApp.renderNodeControls();
+                        }
+                        if (this.classificationApp.classificationViz) {
+                            this.classificationApp.classificationViz.resize();
+                        }
+                    }, 50);
+                }
+            }
+        }
+    }
+}
+
+// Initialize mode controller when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    window.app = new App();
+    window.modeController = new ModeController();
 });

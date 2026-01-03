@@ -1482,3 +1482,266 @@ body {
     color: var(--text-primary);
     padding: 4px;
 }
+
+/* ============================================
+   LANDING PAGE - Problem Type Selector
+   ============================================ */
+
+.landing-page {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--bg-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    overflow-y: auto;
+    padding: 40px 20px;
+}
+
+.landing-page.hidden {
+    display: none;
+}
+
+.landing-content {
+    max-width: 1200px;
+    width: 100%;
+    text-align: center;
+}
+
+.landing-title {
+    font-size: 3rem;
+    font-weight: 700;
+    background: var(--accent-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 12px;
+    letter-spacing: -0.5px;
+}
+
+.landing-subtitle {
+    font-size: 1.2rem;
+    color: var(--text-secondary);
+    margin-bottom: 48px;
+}
+
+/* Problem Cards Grid */
+.problem-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+    max-width: 960px;
+    margin: 0 auto;
+}
+
+.problem-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 32px 24px;
+    text-align: left;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    position: relative;
+    overflow: hidden;
+}
+
+.problem-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--accent-gradient);
+    opacity: 0;
+    transition: opacity var(--transition-normal);
+}
+
+.problem-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--accent-primary);
+    box-shadow: 0 12px 40px rgba(99, 102, 241, 0.2);
+}
+
+.problem-card:hover::before {
+    opacity: 1;
+}
+
+.problem-card-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.problem-card-disabled:hover {
+    transform: none;
+    border-color: var(--border-color);
+    box-shadow: none;
+}
+
+.problem-icon {
+    font-size: 3rem;
+    margin-bottom: 16px;
+}
+
+.problem-card h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+}
+
+.problem-card>p {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+    line-height: 1.6;
+}
+
+.problem-features {
+    list-style: none;
+    margin-bottom: 24px;
+}
+
+.problem-features li {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    padding: 4px 0;
+    padding-left: 20px;
+    position: relative;
+}
+
+.problem-features li::before {
+    content: '✓';
+    position: absolute;
+    left: 0;
+    color: var(--success);
+}
+
+.problem-start {
+    width: 100%;
+    padding: 12px;
+    font-size: 1rem;
+}
+
+/* ============================================
+   MODE HEADER
+   ============================================ */
+
+.mode-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 48px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    z-index: 500;
+    gap: 16px;
+}
+
+.mode-header.hidden {
+    display: none;
+}
+
+.mode-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.btn-ghost {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: color var(--transition-fast);
+}
+
+.btn-ghost:hover {
+    color: var(--text-primary);
+}
+
+/* ============================================
+   MODE CONTAINERS
+   ============================================ */
+
+.mode-container {
+    position: fixed;
+    top: 48px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.mode-container.hidden {
+    display: none;
+}
+
+.mode-container .app-container {
+    height: 100%;
+}
+
+/* ============================================
+   CLASSIFICATION LAYOUT
+   ============================================ */
+
+.classification-layout {
+    display: grid;
+    grid-template-columns: 280px 1fr 220px;
+    height: 100%;
+    padding: 12px;
+    gap: 12px;
+}
+
+.classification-panel {
+    flex: 1;
+    min-height: 0;
+}
+
+.classification-panel .panel-body {
+    flex: 1;
+    position: relative;
+}
+
+.classification-panel canvas {
+    width: 100% !important;
+    height: 100% !important;
+    cursor: crosshair;
+}
+
+.cls-class-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.select-sm {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+}
+
+/* Responsive landing page */
+@media (max-width: 768px) {
+    .landing-title {
+        font-size: 2rem;
+    }
+
+    .landing-subtitle {
+        font-size: 1rem;
+    }
+
+    .problem-cards {
+        grid-template-columns: 1fr;
+    }
+}
