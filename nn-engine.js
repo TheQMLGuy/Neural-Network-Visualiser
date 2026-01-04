@@ -694,6 +694,16 @@ class NeuralNetwork {
         this.weightGradients = [];
         this.biasGradients = [];
 
+        // Enhanced gradient storage for backprop visualization
+        this.deltaValues = [];  // Error signals at each neuron per layer
+        this.layerGradientMagnitudes = [];  // Average gradient magnitude per layer
+        this.maxGradientMagnitude = 0;  // For normalization
+
+        // Dropout support
+        this.dropoutRate = 0;
+        this.dropoutMasks = [];  // Boolean masks for each layer
+        this.isTraining = true;  // Controls dropout behavior
+
         // Training stats
         this.epoch = 0;
         this.lossHistory = [];
@@ -742,6 +752,11 @@ class NeuralNetwork {
         this.layerOutputs = [inputArray];
         this.preActivations = [];
 
+        // Generate dropout masks if training with dropout
+        if (this.isTraining && this.dropoutRate > 0) {
+            this.generateDropoutMasks();
+        }
+
         let current = inputArray;
 
         for (let l = 0; l < this.weights.length; l++) {
@@ -759,7 +774,20 @@ class NeuralNetwork {
                 if (l === this.weights.length - 1) {
                     postAct.push(sum); // Linear output
                 } else {
-                    postAct.push(this.activation.fn(sum));
+                    let activated = this.activation.fn(sum);
+
+                    // Apply dropout during training (not on output layer)
+                    if (this.isTraining && this.dropoutRate > 0 && this.dropoutMasks[l]) {
+                        if (this.dropoutMasks[l][j]) {
+                            // Neuron is dropped - output 0
+                            activated = 0;
+                        } else {
+                            // Scale output by 1/(1-p) to maintain expected value
+                            activated = activated / (1 - this.dropoutRate);
+                        }
+                    }
+
+                    postAct.push(activated);
                 }
             }
 
@@ -770,6 +798,28 @@ class NeuralNetwork {
 
         // Return all outputs (supports multi-output)
         return current;
+    }
+
+    // Generate random dropout masks for hidden layers
+    generateDropoutMasks() {
+        this.dropoutMasks = [];
+
+        // Create masks for hidden layers only (not input or output)
+        for (let l = 0; l < this.weights.length - 1; l++) {
+            const mask = [];
+            for (let j = 0; j < this.weights[l].length; j++) {
+                // true = dropped, false = kept
+                mask.push(Math.random() < this.dropoutRate);
+            }
+            this.dropoutMasks.push(mask);
+        }
+        // No dropout on output layer
+        this.dropoutMasks.push(null);
+    }
+
+    // Set dropout rate (0 to 0.8)
+    setDropoutRate(rate) {
+        this.dropoutRate = Math.max(0, Math.min(0.8, rate));
     }
 
     backward(input, targets) {
@@ -784,8 +834,15 @@ class NeuralNetwork {
         this.weightGradients = [];
         this.biasGradients = [];
 
+        // Initialize delta storage for backprop visualization
+        this.deltaValues = [];
+        this.layerGradientMagnitudes = [];
+
         // Output layer errors (linear output derivative is 1)
         let deltas = errors;
+
+        // Store output layer deltas
+        this.deltaValues.push([...deltas]);
 
         // Backpropagate
         for (let l = this.weights.length - 1; l >= 0; l--) {
@@ -823,7 +880,28 @@ class NeuralNetwork {
                     newDeltas.push(sum * actDeriv);
                 }
                 deltas = newDeltas;
+
+                // Store deltas for this layer (for visualization)
+                this.deltaValues.unshift([...deltas]);
             }
+        }
+
+        // Compute gradient magnitudes per layer for heatmap visualization
+        this.maxGradientMagnitude = 0;
+        for (let l = 0; l < this.weightGradients.length; l++) {
+            let layerSum = 0;
+            let count = 0;
+            for (let j = 0; j < this.weightGradients[l].length; j++) {
+                for (let k = 0; k < this.weightGradients[l][j].length; k++) {
+                    const mag = Math.abs(this.weightGradients[l][j][k]);
+                    layerSum += mag;
+                    count++;
+                    if (mag > this.maxGradientMagnitude) {
+                        this.maxGradientMagnitude = mag;
+                    }
+                }
+            }
+            this.layerGradientMagnitudes.push(count > 0 ? layerSum / count : 0);
         }
 
         // Update weights using optimizer
@@ -901,6 +979,10 @@ class NeuralNetwork {
         this.preActivations = [];
         this.weightGradients = [];
         this.biasGradients = [];
+        this.deltaValues = [];
+        this.layerGradientMagnitudes = [];
+        this.maxGradientMagnitude = 0;
+        this.dropoutMasks = [];
         // Initial values are re-created in initializeWeights
     }
 
@@ -927,6 +1009,53 @@ class NeuralNetwork {
         if (this.initialBiases[layerIndex]) {
             this.initialBiases[layerIndex][nodeIndex] = value;
         }
+    }
+
+    // Export model as JSON object
+    exportModel() {
+        return {
+            version: '1.0',
+            layerSizes: [...this.layerSizes],
+            activationName: this.activationName,
+            optimizerName: this.optimizerName,
+            learningRate: this.learningRate,
+            dropoutRate: this.dropoutRate,
+            weights: this.weights.map(layer => layer.map(neuron => [...neuron])),
+            biases: this.biases.map(layer => [...layer]),
+            initialWeights: this.initialWeights.map(layer => layer.map(neuron => [...neuron])),
+            initialBiases: this.initialBiases.map(layer => [...layer]),
+            epoch: this.epoch,
+            lossHistory: [...this.lossHistory]
+        };
+    }
+
+    // Import model from JSON object
+    static importModel(json) {
+        const network = new NeuralNetwork(
+            json.layerSizes,
+            json.activationName || 'sigmoid',
+            json.optimizerName || 'adam',
+            json.learningRate || 0.01
+        );
+
+        // Restore weights and biases
+        network.weights = json.weights.map(layer => layer.map(neuron => [...neuron]));
+        network.biases = json.biases.map(layer => [...layer]);
+
+        // Restore initial values if present
+        if (json.initialWeights) {
+            network.initialWeights = json.initialWeights.map(layer => layer.map(neuron => [...neuron]));
+        }
+        if (json.initialBiases) {
+            network.initialBiases = json.initialBiases.map(layer => [...layer]);
+        }
+
+        // Restore training state
+        network.epoch = json.epoch || 0;
+        network.lossHistory = json.lossHistory ? [...json.lossHistory] : [];
+        network.dropoutRate = json.dropoutRate || 0;
+
+        return network;
     }
 }
 

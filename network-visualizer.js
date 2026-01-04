@@ -20,7 +20,16 @@ class NetworkVisualizer {
         this.baseNodeRadius = 12;
         this.baseEdgeWidth = 1.5;
 
-        // Display options removed - just size and color now, hover for details
+        // Visualization mode: 'default', 'gradient-heatmap', 'backprop-animation'
+        this.visualizationMode = 'default';
+
+        // Backprop animation state
+        this.backpropAnimationState = {
+            animating: false,
+            currentLayer: -1,
+            progress: 0,
+            startTime: 0
+        };
 
         // Colors
         this.colors = {
@@ -32,6 +41,14 @@ class NetworkVisualizer {
             neutral: '#6366f1',    // Purple - no change/initial
             text: '#a0a0b0',
             textMuted: '#606070',
+            // Gradient heatmap colors (low to high)
+            gradientLow: '#3b82f6',     // Blue
+            gradientMid: '#10b981',     // Green
+            gradientHigh: '#f59e0b',    // Yellow/Orange
+            gradientMax: '#ef4444',     // Red (exploding)
+            // Dropout colors
+            droppedFill: '#0a0a15',
+            droppedStroke: '#404050',
         };
 
         // Setup resize observer
@@ -407,6 +424,171 @@ class NetworkVisualizer {
                 this.drawNode(l, n);
             }
         }
+
+        // Draw gradient legend if in gradient heatmap mode
+        if (this.visualizationMode === 'gradient-heatmap') {
+            this.drawGradientLegend();
+        }
+
+        // Continue backprop animation if active
+        if (this.backpropAnimationState.animating) {
+            this.drawBackpropAnimation();
+        }
+    }
+
+    // Set visualization mode
+    setVisualizationMode(mode) {
+        this.visualizationMode = mode;
+        if (mode !== 'backprop-animation') {
+            this.backpropAnimationState.animating = false;
+        }
+        this.render();
+    }
+
+    // Get gradient color based on magnitude (0 to 1 normalized)
+    getGradientColor(normalizedMag) {
+        if (normalizedMag < 0.25) {
+            return this.colors.gradientLow;  // Blue - low gradient
+        } else if (normalizedMag < 0.5) {
+            return this.colors.gradientMid;  // Green - medium
+        } else if (normalizedMag < 0.75) {
+            return this.colors.gradientHigh; // Yellow/Orange - high
+        } else {
+            return this.colors.gradientMax;  // Red - very high/exploding
+        }
+    }
+
+    // Draw gradient legend in corner
+    drawGradientLegend() {
+        const ctx = this.ctx;
+        const legendWidth = 120;
+        const legendHeight = 20;
+        const x = this.width - legendWidth - 15;
+        const y = 15;
+
+        // Draw background
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.fillRect(x - 5, y - 5, legendWidth + 10, legendHeight + 30);
+
+        // Draw gradient bar
+        const gradient = ctx.createLinearGradient(x, y, x + legendWidth, y);
+        gradient.addColorStop(0, this.colors.gradientLow);
+        gradient.addColorStop(0.33, this.colors.gradientMid);
+        gradient.addColorStop(0.66, this.colors.gradientHigh);
+        gradient.addColorStop(1, this.colors.gradientMax);
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x, y, legendWidth, legendHeight);
+
+        // Draw labels
+        ctx.fillStyle = this.colors.text;
+        ctx.font = '10px Inter, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('Low', x, y + legendHeight + 12);
+        ctx.textAlign = 'center';
+        ctx.fillText('Gradient', x + legendWidth / 2, y + legendHeight + 12);
+        ctx.textAlign = 'right';
+        ctx.fillText('High', x + legendWidth, y + legendHeight + 12);
+    }
+
+    // Start backpropagation animation
+    startBackpropAnimation() {
+        this.visualizationMode = 'backprop-animation';
+        this.backpropAnimationState = {
+            animating: true,
+            currentLayer: this.network.weights.length, // Start from output
+            progress: 0,
+            startTime: performance.now()
+        };
+        this.animateBackpropFrame();
+    }
+
+    // Animation frame for backprop
+    animateBackpropFrame() {
+        if (!this.backpropAnimationState.animating) return;
+
+        const elapsed = performance.now() - this.backpropAnimationState.startTime;
+        const layerDuration = 800; // ms per layer
+        const totalLayers = this.network.weights.length;
+
+        const totalProgress = elapsed / layerDuration;
+        const currentLayer = totalLayers - Math.floor(totalProgress);
+        const layerProgress = totalProgress % 1;
+
+        if (currentLayer < 0) {
+            // Animation complete
+            this.backpropAnimationState.animating = false;
+            this.render();
+            return;
+        }
+
+        this.backpropAnimationState.currentLayer = currentLayer;
+        this.backpropAnimationState.progress = layerProgress;
+
+        this.render();
+        requestAnimationFrame(() => this.animateBackpropFrame());
+    }
+
+    // Draw backprop animation overlay
+    drawBackpropAnimation() {
+        const ctx = this.ctx;
+        const state = this.backpropAnimationState;
+
+        if (state.currentLayer < 0 || state.currentLayer >= this.network.weights.length) return;
+
+        // Draw flowing arrows from right to left for current layer
+        const layerIndex = state.currentLayer;
+        const fromPositions = this.nodePositions[layerIndex + 1];
+        const toPositions = this.nodePositions[layerIndex];
+
+        ctx.save();
+
+        for (let j = 0; j < fromPositions.length; j++) {
+            for (let k = 0; k < toPositions.length; k++) {
+                const from = fromPositions[j];
+                const to = toPositions[k];
+
+                // Get gradient magnitude for color intensity
+                let gradMag = 0;
+                if (this.network.weightGradients[layerIndex] &&
+                    this.network.weightGradients[layerIndex][j]) {
+                    gradMag = Math.abs(this.network.weightGradients[layerIndex][j][k] || 0);
+                }
+                const normalizedMag = this.network.maxGradientMagnitude > 0
+                    ? Math.min(1, gradMag / this.network.maxGradientMagnitude)
+                    : 0;
+
+                // Draw particle flowing backward
+                const particleX = from.x - (from.x - to.x) * state.progress;
+                const particleY = from.y - (from.y - to.y) * state.progress;
+
+                const color = this.getGradientColor(normalizedMag);
+                const size = 3 + normalizedMag * 4;
+
+                ctx.beginPath();
+                ctx.arc(particleX, particleY, size, 0, Math.PI * 2);
+                ctx.fillStyle = color;
+                ctx.globalAlpha = 0.8;
+                ctx.fill();
+
+                // Draw trail
+                ctx.beginPath();
+                ctx.moveTo(from.x, from.y);
+                ctx.lineTo(particleX, particleY);
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+                ctx.globalAlpha = 0.4;
+                ctx.stroke();
+            }
+        }
+
+        ctx.restore();
+
+        // Draw layer label
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 14px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`← Backprop Layer ${layerIndex + 1}`, this.width / 2, this.height - 20);
     }
 
     drawConnection(layerIndex, fromNode, toNode) {
@@ -427,14 +609,31 @@ class NetworkVisualizer {
             this.hoveredConnection.fromNode === fromNode &&
             this.hoveredConnection.toNode === toNode;
 
-        // Color based on delta: green if increased, red if decreased
         let color;
-        if (Math.abs(delta) < 0.0001) {
-            color = this.colors.neutral;
-        } else if (delta > 0) {
-            color = this.colors.increased;
+        let alpha = 0.5 + Math.min(Math.abs(delta) * 0.5, 0.4);
+
+        // Choose coloring based on visualization mode
+        if (this.visualizationMode === 'gradient-heatmap') {
+            // Color by gradient magnitude
+            let gradMag = 0;
+            if (this.network.weightGradients[layerIndex] &&
+                this.network.weightGradients[layerIndex][toNode]) {
+                gradMag = Math.abs(this.network.weightGradients[layerIndex][toNode][fromNode] || 0);
+            }
+            const normalizedMag = this.network.maxGradientMagnitude > 0
+                ? Math.min(1, gradMag / this.network.maxGradientMagnitude)
+                : 0;
+            color = this.getGradientColor(normalizedMag);
+            alpha = 0.4 + normalizedMag * 0.6;
         } else {
-            color = this.colors.decreased;
+            // Default: color based on delta (green if increased, red if decreased)
+            if (Math.abs(delta) < 0.0001) {
+                color = this.colors.neutral;
+            } else if (delta > 0) {
+                color = this.colors.increased;
+            } else {
+                color = this.colors.decreased;
+            }
         }
 
         // Dynamic width based on delta
@@ -451,7 +650,7 @@ class NetworkVisualizer {
         } else {
             ctx.strokeStyle = color;
             ctx.lineWidth = lineWidth;
-            ctx.globalAlpha = 0.5 + Math.min(Math.abs(delta) * 0.5, 0.4);
+            ctx.globalAlpha = alpha;
         }
 
         ctx.stroke();
@@ -462,6 +661,18 @@ class NetworkVisualizer {
         const ctx = this.ctx;
         const pos = this.nodePositions[layerIndex][nodeIndex];
         const radius = this.getNodeRadius(layerIndex, nodeIndex);
+
+        // Check if this neuron is dropped (during training visualization)
+        let isDropped = false;
+        if (this.network.isTraining &&
+            this.network.dropoutRate > 0 &&
+            layerIndex > 0 &&
+            layerIndex < this.nodePositions.length - 1) {
+            const dropoutLayerIndex = layerIndex - 1;
+            if (this.network.dropoutMasks[dropoutLayerIndex]) {
+                isDropped = this.network.dropoutMasks[dropoutLayerIndex][nodeIndex] === true;
+            }
+        }
 
         // Get delta for coloring (skip input layer)
         let delta = 0;
@@ -477,12 +688,27 @@ class NetworkVisualizer {
                 : 0;
             delta = currentBias - initialBias;
 
-            if (Math.abs(delta) < 0.0001) {
-                color = this.colors.neutral;
-            } else if (delta > 0) {
-                color = this.colors.increased;
+            if (this.visualizationMode === 'gradient-heatmap' && layerIndex < this.nodePositions.length - 1) {
+                // Use gradient magnitude for node color
+                let deltaMag = 0;
+                if (this.network.deltaValues[layerIndex - 1]) {
+                    deltaMag = Math.abs(this.network.deltaValues[layerIndex - 1][nodeIndex] || 0);
+                }
+                const maxDelta = Math.max(...this.network.deltaValues.flat().map(Math.abs), 0.001);
+                const normalizedMag = Math.min(1, deltaMag / maxDelta);
+                color = this.getGradientColor(normalizedMag);
+            } else if (isDropped) {
+                // Dropped neuron styling
+                color = this.colors.droppedStroke;
             } else {
-                color = this.colors.decreased;
+                // Default delta-based coloring
+                if (Math.abs(delta) < 0.0001) {
+                    color = this.colors.neutral;
+                } else if (delta > 0) {
+                    color = this.colors.increased;
+                } else {
+                    color = this.colors.decreased;
+                }
             }
         }
 
@@ -491,29 +717,33 @@ class NetworkVisualizer {
             this.hoveredNode.layer === layerIndex &&
             this.hoveredNode.node === nodeIndex;
 
-        // Draw glow
-        const gradient = ctx.createRadialGradient(
-            pos.x, pos.y, 0,
-            pos.x, pos.y, radius * 2
-        );
-        const glowIntensity = isHovered ? 0.8 : 0.3;
-        gradient.addColorStop(0, `${color}${Math.floor(glowIntensity * 255).toString(16).padStart(2, '0')}`);
-        gradient.addColorStop(1, `${color}00`);
+        // Draw glow (skip for dropped neurons)
+        if (!isDropped) {
+            const gradient = ctx.createRadialGradient(
+                pos.x, pos.y, 0,
+                pos.x, pos.y, radius * 2
+            );
+            const glowIntensity = isHovered ? 0.8 : 0.3;
+            gradient.addColorStop(0, `${color}${Math.floor(glowIntensity * 255).toString(16).padStart(2, '0')}`);
+            gradient.addColorStop(1, `${color}00`);
 
-        ctx.beginPath();
-        ctx.arc(pos.x, pos.y, radius * 2, 0, Math.PI * 2);
-        ctx.fillStyle = gradient;
-        ctx.fill();
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, radius * 2, 0, Math.PI * 2);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+        }
 
         // Draw actual node (sized based on delta)
         ctx.beginPath();
         ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
-        ctx.fillStyle = this.colors.nodeFill;
+        ctx.fillStyle = isDropped ? this.colors.droppedFill : this.colors.nodeFill;
+        ctx.globalAlpha = isDropped ? 0.4 : 1;
         ctx.fill();
+        ctx.globalAlpha = 1;
 
         // Draw WHITE DASHED reference circle at original size INSIDE larger nodes
         // Only draw if node is larger than base, so it appears inside
-        if (layerIndex > 0 && radius > this.baseNodeRadius) {
+        if (layerIndex > 0 && radius > this.baseNodeRadius && !isDropped) {
             ctx.beginPath();
             ctx.arc(pos.x, pos.y, this.baseNodeRadius, 0, Math.PI * 2);
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
@@ -523,7 +753,7 @@ class NetworkVisualizer {
             ctx.setLineDash([]);
         }
         // If node is smaller than base, draw reference OUTSIDE
-        if (layerIndex > 0 && radius < this.baseNodeRadius) {
+        if (layerIndex > 0 && radius < this.baseNodeRadius && !isDropped) {
             ctx.beginPath();
             ctx.arc(pos.x, pos.y, this.baseNodeRadius, 0, Math.PI * 2);
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
@@ -533,10 +763,32 @@ class NetworkVisualizer {
             ctx.setLineDash([]);
         }
 
-        // Stroke based on delta color
+        // Stroke based on delta color (dashed for dropped neurons)
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
         ctx.strokeStyle = isHovered ? '#ffffff' : color;
         ctx.lineWidth = isHovered ? 3 : 2;
+        if (isDropped) {
+            ctx.setLineDash([4, 4]);
+            ctx.globalAlpha = 0.5;
+        }
         ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
+
+        // Draw X overlay for dropped neurons
+        if (isDropped) {
+            ctx.beginPath();
+            ctx.moveTo(pos.x - radius * 0.5, pos.y - radius * 0.5);
+            ctx.lineTo(pos.x + radius * 0.5, pos.y + radius * 0.5);
+            ctx.moveTo(pos.x + radius * 0.5, pos.y - radius * 0.5);
+            ctx.lineTo(pos.x - radius * 0.5, pos.y + radius * 0.5);
+            ctx.strokeStyle = this.colors.decreased;
+            ctx.lineWidth = 2;
+            ctx.globalAlpha = 0.7;
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+        }
 
 
 

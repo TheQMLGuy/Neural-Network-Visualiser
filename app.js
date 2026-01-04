@@ -316,6 +316,126 @@ class App {
 
         document.getElementById('step-btn').addEventListener('click', () => this.step());
         document.getElementById('reset-btn').addEventListener('click', () => this.reset());
+
+        // Dropout rate slider
+        const dropoutSlider = document.getElementById('dropout-rate');
+        const dropoutValue = document.getElementById('dropout-rate-value');
+        if (dropoutSlider) {
+            dropoutSlider.addEventListener('input', (e) => {
+                const rate = parseFloat(e.target.value);
+                this.network.setDropoutRate(rate);
+                if (dropoutValue) {
+                    dropoutValue.textContent = `${Math.round(rate * 100)}%`;
+                }
+            });
+        }
+
+        // Visualization mode buttons
+        const vizModeContainer = document.querySelector('.viz-mode-btns');
+        if (vizModeContainer) {
+            vizModeContainer.addEventListener('click', (e) => {
+                const btn = e.target.closest('.viz-mode-btn');
+                if (!btn) return;
+
+                const mode = btn.dataset.mode;
+
+                // Update button states
+                vizModeContainer.querySelectorAll('.viz-mode-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                // Set visualization mode
+                if (mode === 'backprop-animation') {
+                    this.networkViz.startBackpropAnimation();
+                } else {
+                    this.networkViz.setVisualizationMode(mode);
+                }
+            });
+        }
+
+        // Model export
+        const exportBtn = document.getElementById('export-model');
+        if (exportBtn) {
+            exportBtn.addEventListener('click', () => this.exportModel());
+        }
+
+        // Model import
+        const importBtn = document.getElementById('import-model-btn');
+        const importFile = document.getElementById('import-model-file');
+        if (importBtn && importFile) {
+            importBtn.addEventListener('click', () => importFile.click());
+            importFile.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    this.importModel(e.target.files[0]);
+                    e.target.value = ''; // Reset for re-import
+                }
+            });
+        }
+    }
+
+    // Export model as JSON file
+    exportModel() {
+        const modelData = this.network.exportModel();
+        // Add app-specific state
+        modelData.outputFunctions = [...this.outputFunctions];
+        modelData.targetFunctionName = this.targetFunctionName;
+
+        const json = JSON.stringify(modelData, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `nn-model-${Date.now()}.json`;
+        a.click();
+
+        URL.revokeObjectURL(url);
+    }
+
+    // Import model from JSON file
+    importModel(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const json = JSON.parse(e.target.result);
+
+                // Restore network
+                this.network = NeuralNetwork.importModel(json);
+                this.layerSizes = [...json.layerSizes];
+                this.activationName = json.activationName;
+                this.optimizerName = json.optimizerName;
+                this.learningRate = json.learningRate;
+
+                // Restore output functions
+                if (json.outputFunctions) {
+                    this.outputFunctions = [...json.outputFunctions];
+                    this.targetFunctionName = this.outputFunctions[0];
+                }
+
+                // Update visualizers
+                this.networkViz.setNetwork(this.network);
+                this.curveViz.setNetwork(this.network);
+                this.updateCurveVizTargets();
+                this.forwardPassGraph.setNetwork(this.network);
+                this.lossChart.update(this.network.lossHistory);
+                this.accuracyChart.clear();
+                this.accuracyHistory = [];
+                this.renderNodeControls();
+                this.renderOutputControls();
+                this.updateAllVisualizers();
+
+                // Update UI controls to match imported settings
+                document.getElementById('activation-select').value = this.activationName;
+                document.getElementById('optimizer-select').value = this.optimizerName;
+                document.getElementById('learning-rate').value = this.learningRate;
+                document.getElementById('target-function').value = this.targetFunctionName;
+
+                console.log('Model imported successfully');
+            } catch (err) {
+                console.error('Failed to import model:', err);
+                alert('Failed to import model: ' + err.message);
+            }
+        };
+        reader.readAsText(file);
     }
 
     populateFunctionDropdown() {
@@ -659,6 +779,10 @@ class ClassificationApp {
         this.lossChart = new LossChart('cls-loss-canvas');
         this.accuracyChart = new AccuracyChart('cls-accuracy-canvas');
 
+        // Metrics
+        this.metrics = new ClassificationMetrics();
+        this.confusionMatrixViz = new ConfusionMatrixVisualizer('cls-confusion-matrix');
+
         this.networkViz.setNetwork(this.network);
         this.classificationViz.setNetwork(this.network);
     }
@@ -713,6 +837,41 @@ class ClassificationApp {
         // Layer controls
         document.getElementById('cls-add-layer').addEventListener('click', () => this.addLayer());
         document.getElementById('cls-remove-layer').addEventListener('click', () => this.removeLayer());
+
+        // Dropout rate slider
+        const dropoutSlider = document.getElementById('cls-dropout-rate');
+        const dropoutValue = document.getElementById('cls-dropout-rate-value');
+        if (dropoutSlider) {
+            dropoutSlider.addEventListener('input', (e) => {
+                const rate = parseFloat(e.target.value);
+                this.network.setDropoutRate(rate);
+                if (dropoutValue) {
+                    dropoutValue.textContent = `${Math.round(rate * 100)}%`;
+                }
+            });
+        }
+
+        // Visualization mode buttons
+        const vizModeContainer = document.querySelector('#classification-mode .viz-mode-btns');
+        if (vizModeContainer) {
+            vizModeContainer.addEventListener('click', (e) => {
+                const btn = e.target.closest('.viz-mode-btn');
+                if (!btn) return;
+
+                const mode = btn.dataset.mode;
+
+                // Update button states
+                vizModeContainer.querySelectorAll('.viz-mode-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                // Set visualization mode
+                if (mode === 'backprop-animation') {
+                    this.networkViz.startBackpropAnimation();
+                } else {
+                    this.networkViz.setVisualizationMode(mode);
+                }
+            });
+        }
     }
 
     addLayer() {
@@ -859,12 +1018,35 @@ class ClassificationApp {
             : 0;
         document.getElementById('cls-current-loss').textContent = currentLoss.toFixed(4);
 
-        // Accuracy
-        const accuracy = this.classificationViz.calculateAccuracy();
-        if (this.network.epoch > 0) {
-            this.accuracyHistory.push(accuracy);
+        // Calculate metrics from predictions
+        const points = this.classificationViz.points;
+        if (points.length > 0 && this.network) {
+            const predictions = points.map(p => this.network.forward([p.x, p.y])[0]);
+            const targets = points.map(p => p.class);
+
+            this.metrics.update(predictions, targets);
+            const allMetrics = this.metrics.getAllMetrics();
+
+            // Update accuracy
+            const accuracy = allMetrics.accuracy;
+            if (this.network.epoch > 0) {
+                this.accuracyHistory.push(accuracy);
+            }
+            document.getElementById('cls-current-accuracy').textContent = `${accuracy.toFixed(1)}%`;
+
+            // Update precision, recall, F1
+            document.getElementById('cls-precision').textContent = `${allMetrics.precision.toFixed(1)}%`;
+            document.getElementById('cls-recall').textContent = `${allMetrics.recall.toFixed(1)}%`;
+            document.getElementById('cls-f1').textContent = `${allMetrics.f1Score.toFixed(1)}%`;
+
+            // Update confusion matrix
+            this.confusionMatrixViz.render(allMetrics.confusionMatrix, ['Red', 'Blue']);
+        } else {
+            document.getElementById('cls-current-accuracy').textContent = '0.0%';
+            document.getElementById('cls-precision').textContent = '0.0%';
+            document.getElementById('cls-recall').textContent = '0.0%';
+            document.getElementById('cls-f1').textContent = '0.0%';
         }
-        document.getElementById('cls-current-accuracy').textContent = `${accuracy.toFixed(1)}%`;
 
         // Weight count
         const stats = this.network.getWeightStats();
