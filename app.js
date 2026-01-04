@@ -294,6 +294,10 @@ class App {
                 // Check for any fullscreen panel
                 const fullscreenPanel = document.querySelector('.panel.fullscreen');
                 if (fullscreenPanel) {
+                    // Ignore classification panels (handled by ClassificationApp)
+                    if (fullscreenPanel.id && fullscreenPanel.id.startsWith('cls-')) {
+                        return;
+                    }
                     this.toggleFullscreen(fullscreenPanel.id);
                     return;
                 }
@@ -872,6 +876,45 @@ class ClassificationApp {
                 }
             });
         }
+
+        // Fullscreen toggles
+        const fsNetwork = document.getElementById('btn-fullscreen-cls-network');
+        if (fsNetwork) {
+            fsNetwork.addEventListener('click', () => this.toggleFullscreen('cls-network-panel'));
+        }
+
+        const fsDecision = document.getElementById('btn-fullscreen-cls-decision');
+        if (fsDecision) {
+            fsDecision.addEventListener('click', () => this.toggleFullscreen('cls-decision-panel'));
+        }
+
+        // ESC key to exit fullscreen (Classification specific)
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const fullscreenPanel = document.querySelector('.panel.fullscreen');
+                if (fullscreenPanel && fullscreenPanel.id && fullscreenPanel.id.startsWith('cls-')) {
+                    this.toggleFullscreen(fullscreenPanel.id);
+                }
+            }
+        });
+    }
+
+    toggleFullscreen(panelId) {
+        const panel = document.getElementById(panelId);
+        if (!panel) return;
+
+        panel.classList.toggle('fullscreen');
+
+        // Trigger resize
+        setTimeout(() => {
+            if (this.networkViz) this.networkViz.resize();
+            if (this.classificationViz) this.classificationViz.resize();
+
+            // Re-render controls if network panel is resized
+            if (panelId === 'cls-network-panel') {
+                this.renderNodeControls();
+            }
+        }, 50);
     }
 
     addLayer() {

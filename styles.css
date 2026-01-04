@@ -720,6 +720,11 @@ body {
     max-height: none !important;
 }
 
+/* Hide mode header when any panel is fullscreen to prevent accidental back navigation */
+body:has(.panel.fullscreen) #mode-header {
+    display: none !important;
+}
+
 /* Modal Fullscreen */
 .modal-content.fullscreen {
     position: fixed !important;

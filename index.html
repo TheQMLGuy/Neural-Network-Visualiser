@@ -70,7 +70,7 @@
         <div class="app-container three-column">
             <!-- LEFT: Network Views -->
             <aside class="left-panel">
-                <section class="panel network-panel">
+                <section id="network-panel" class="panel network-panel">
                     <div class="panel-header compact">
                         <h2>Network</h2>
                         <div class="header-right">
@@ -96,7 +96,7 @@
                     </div>
                 </section>
 
-                <section class="panel forward-pass-panel">
+                <section id="forward-pass-panel" class="panel forward-pass-panel">
                     <div class="panel-header compact">
                         <h2>Forward Pass</h2>
                         <div class="header-right">
@@ -342,11 +342,13 @@
         <div class="app-container classification-layout">
             <!-- LEFT: Network -->
             <aside class="left-panel">
-                <section class="panel network-panel">
+                <section id="cls-network-panel" class="panel network-panel">
                     <div class="panel-header compact">
                         <h2>Network</h2>
                         <div class="header-right">
                             <span id="cls-weight-count" class="badge">0 weights</span>
+                            <button id="btn-fullscreen-cls-network" class="btn btn-xs btn-fullscreen"
+                                title="Fullscreen">⛶</button>
                         </div>
                     </div>
                     <div class="panel-body">
@@ -365,7 +367,7 @@
 
             <!-- MIDDLE: Classification Visualizer -->
             <main class="middle-panel">
-                <section class="panel classification-panel">
+                <section id="cls-decision-panel" class="panel classification-panel">
                     <div class="panel-header compact">
                         <h2>Decision Boundary</h2>
                         <div class="header-right">
@@ -377,6 +379,8 @@
                                 </select>
                             </label>
                             <button id="cls-clear-points" class="btn btn-xs btn-danger">Clear</button>
+                            <button id="btn-fullscreen-cls-decision" class="btn btn-xs btn-fullscreen"
+                                title="Fullscreen">⛶</button>
                         </div>
                     </div>
                     <div class="panel-body">
