@@ -1786,6 +1786,92 @@ body {
     background: #10b981;
 }
 
+/* ============================================
+   CNN LAYOUT
+   ============================================ */
+
+.cnn-layout {
+    display: grid;
+    grid-template-columns: 240px 1fr 220px;
+    height: 100%;
+    padding: 12px;
+    gap: 12px;
+}
+
+.cnn-layout .left-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.cnn-input-body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+}
+
+.input-panel {
+    flex: 0 0 auto;
+}
+
+.prediction-panel {
+    flex: 1;
+    min-height: 0;
+}
+
+.gate-panel,
+.attention-panel,
+.feature-panel {
+    flex: 0 0 140px;
+}
+
+/* CNN Prediction Bars */
+.cnn-pred-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.cnn-pred-row.active {
+    background: rgba(99, 102, 241, 0.2);
+}
+
+.cnn-pred-label {
+    width: 70px;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.cnn-pred-bar-bg {
+    flex: 1;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.cnn-pred-bar {
+    height: 100%;
+    background: var(--accent-primary);
+    transition: width 0.3s;
+}
+
+.cnn-pred-value {
+    width: 45px;
+    text-align: right;
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.btn-sm {
+    padding: 4px 8px;
+    font-size: 0.7rem;
+}
+
 /* Responsive landing page */
 @media (max-width: 768px) {
     .landing-title {

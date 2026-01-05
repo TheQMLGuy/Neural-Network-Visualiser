@@ -55,6 +55,45 @@
                     </ul>
                     <button class="btn btn-primary problem-start">Start →</button>
                 </div>
+
+                <!-- LSTM Card -->
+                <div class="problem-card" data-mode="lstm">
+                    <div class="problem-icon">🧠</div>
+                    <h2>LSTM Network</h2>
+                    <p>Advanced RNN with gates to control information flow and solve vanishing gradients.</p>
+                    <ul class="problem-features">
+                        <li>Forget, input, output gates</li>
+                        <li>Cell state visualization</li>
+                        <li>Long-term dependencies</li>
+                    </ul>
+                    <button class="btn btn-primary problem-start">Start →</button>
+                </div>
+
+                <!-- Transformer Card -->
+                <div class="problem-card" data-mode="transformer">
+                    <div class="problem-icon">⚡</div>
+                    <h2>Transformer</h2>
+                    <p>Self-attention mechanism for parallel sequence processing without recurrence.</p>
+                    <ul class="problem-features">
+                        <li>Attention weight heatmaps</li>
+                        <li>Positional encoding</li>
+                        <li>Feed-forward blocks</li>
+                    </ul>
+                    <button class="btn btn-primary problem-start">Start →</button>
+                </div>
+
+                <!-- CNN Card -->
+                <div class="problem-card" data-mode="cnn">
+                    <div class="problem-icon">🖼️</div>
+                    <h2>CNN</h2>
+                    <p>Convolutional neural network for spatial pattern recognition in images.</p>
+                    <ul class="problem-features">
+                        <li>Draw your own patterns</li>
+                        <li>Feature map visualization</li>
+                        <li>Filter learning</li>
+                    </ul>
+                    <button class="btn btn-primary problem-start">Start →</button>
+                </div>
             </div>
         </div>
     </div>
@@ -655,13 +694,275 @@
         </div>
     </div><!-- end rnn-mode -->
 
+    <!-- LSTM MODE -->
+    <div id="lstm-mode" class="mode-container hidden">
+        <div class="app-container rnn-layout">
+            <aside class="left-panel">
+                <section class="panel network-panel">
+                    <div class="panel-header compact">
+                        <h2>LSTM Cell</h2>
+                        <span id="lstm-weight-count" class="badge">0 weights</span>
+                    </div>
+                    <div class="panel-body">
+                        <canvas id="lstm-network-canvas"></canvas>
+                    </div>
+                </section>
+                <section class="panel gate-panel">
+                    <div class="panel-header compact">
+                        <h2>Gate Activations</h2>
+                    </div>
+                    <div class="panel-body">
+                        <canvas id="lstm-gate-canvas"></canvas>
+                    </div>
+                </section>
+            </aside>
+            <main class="middle-panel">
+                <section class="panel sequence-panel">
+                    <div class="panel-header compact">
+                        <h2>Sequence Prediction</h2>
+                    </div>
+                    <div class="panel-body"><canvas id="lstm-sequence-canvas"></canvas></div>
+                </section>
+                <div class="metrics-row">
+                    <section class="panel metric-panel">
+                        <div class="panel-header compact">
+                            <h2>Loss</h2><span id="lstm-current-loss" class="badge loss-badge">0.0000</span>
+                        </div>
+                        <div class="panel-body"><canvas id="lstm-loss-canvas"></canvas></div>
+                    </section>
+                    <section class="panel metric-panel">
+                        <div class="panel-header compact">
+                            <h2>Accuracy</h2><span id="lstm-current-accuracy" class="badge accuracy-badge">0.00%</span>
+                        </div>
+                        <div class="panel-body"><canvas id="lstm-accuracy-canvas"></canvas></div>
+                    </section>
+                </div>
+                <div class="training-bar">
+                    <div class="epoch-badge">Epoch <span id="lstm-epoch-counter">0</span></div>
+                    <button id="lstm-play-btn" class="btn btn-primary">▶ Play</button>
+                    <button id="lstm-step-btn" class="btn">⏭ Step</button>
+                    <button id="lstm-reset-btn" class="btn btn-danger">↺ Reset</button>
+                </div>
+            </main>
+            <aside class="right-panel">
+                <div class="params-header"><span>Parameters</span></div>
+                <div class="param-group"><label>Dataset</label>
+                    <select id="lstm-dataset" class="select">
+                        <option value="sineWave" selected>Sine Wave</option>
+                        <option value="squareWave">Square Wave</option>
+                        <option value="echo">Echo (delay=3)</option>
+                    </select>
+                </div>
+                <div class="param-group"><label>Hidden Units</label>
+                    <select id="lstm-hidden-size" class="select">
+                        <option value="4">4</option>
+                        <option value="8" selected>8</option>
+                        <option value="16">16</option>
+                    </select>
+                </div>
+                <div class="param-group"><label>Sequence Length</label>
+                    <select id="lstm-seq-length" class="select">
+                        <option value="10">10</option>
+                        <option value="20" selected>20</option>
+                        <option value="30">30</option>
+                    </select>
+                </div>
+                <div class="param-group"><label>Learning Rate</label>
+                    <input type="number" id="lstm-learning-rate" class="input" value="0.01" min="0.001" max="1"
+                        step="0.001">
+                </div>
+                <div class="param-group"><label>Step Size</label>
+                    <select id="lstm-step-size" class="select">
+                        <option value="1">1</option>
+                        <option value="5" selected>5</option>
+                        <option value="10">10</option>
+                    </select>
+                </div>
+            </aside>
+        </div>
+    </div><!-- end lstm-mode -->
+
+    <!-- TRANSFORMER MODE -->
+    <div id="transformer-mode" class="mode-container hidden">
+        <div class="app-container rnn-layout">
+            <aside class="left-panel">
+                <section class="panel network-panel">
+                    <div class="panel-header compact">
+                        <h2>Architecture</h2><span id="transformer-weight-count" class="badge">0 weights</span>
+                    </div>
+                    <div class="panel-body"><canvas id="transformer-network-canvas"></canvas></div>
+                </section>
+                <section class="panel attention-panel">
+                    <div class="panel-header compact">
+                        <h2>Attention Weights</h2>
+                    </div>
+                    <div class="panel-body"><canvas id="transformer-attention-canvas"></canvas></div>
+                </section>
+            </aside>
+            <main class="middle-panel">
+                <section class="panel sequence-panel">
+                    <div class="panel-header compact">
+                        <h2>Sequence Prediction</h2>
+                    </div>
+                    <div class="panel-body"><canvas id="transformer-sequence-canvas"></canvas></div>
+                </section>
+                <div class="metrics-row">
+                    <section class="panel metric-panel">
+                        <div class="panel-header compact">
+                            <h2>Loss</h2><span id="transformer-current-loss" class="badge loss-badge">0.0000</span>
+                        </div>
+                        <div class="panel-body"><canvas id="transformer-loss-canvas"></canvas></div>
+                    </section>
+                    <section class="panel metric-panel">
+                        <div class="panel-header compact">
+                            <h2>Accuracy</h2><span id="transformer-current-accuracy"
+                                class="badge accuracy-badge">0.00%</span>
+                        </div>
+                        <div class="panel-body"><canvas id="transformer-accuracy-canvas"></canvas></div>
+                    </section>
+                </div>
+                <div class="training-bar">
+                    <div class="epoch-badge">Epoch <span id="transformer-epoch-counter">0</span></div>
+                    <button id="transformer-play-btn" class="btn btn-primary">▶ Play</button>
+                    <button id="transformer-step-btn" class="btn">⏭ Step</button>
+                    <button id="transformer-reset-btn" class="btn btn-danger">↺ Reset</button>
+                </div>
+            </main>
+            <aside class="right-panel">
+                <div class="params-header"><span>Parameters</span></div>
+                <div class="param-group"><label>Dataset</label>
+                    <select id="transformer-dataset" class="select">
+                        <option value="copy" selected>Copy Task</option>
+                        <option value="reverse">Reverse</option>
+                        <option value="pattern">Pattern</option>
+                    </select>
+                </div>
+                <div class="param-group"><label>Embed Dimension</label>
+                    <select id="transformer-embed-dim" class="select">
+                        <option value="4">4</option>
+                        <option value="8" selected>8</option>
+                        <option value="16">16</option>
+                    </select>
+                </div>
+                <div class="param-group"><label>Sequence Length</label>
+                    <select id="transformer-seq-length" class="select">
+                        <option value="8">8</option>
+                        <option value="12" selected>12</option>
+                        <option value="16">16</option>
+                    </select>
+                </div>
+                <div class="param-group"><label>Learning Rate</label>
+                    <input type="number" id="transformer-learning-rate" class="input" value="0.01" min="0.001" max="1"
+                        step="0.001">
+                </div>
+                <div class="param-group"><label>Step Size</label>
+                    <select id="transformer-step-size" class="select">
+                        <option value="1">1</option>
+                        <option value="5" selected>5</option>
+                        <option value="10">10</option>
+                    </select>
+                </div>
+            </aside>
+        </div>
+    </div><!-- end transformer-mode -->
+
+    <!-- CNN MODE -->
+    <div id="cnn-mode" class="mode-container hidden">
+        <div class="app-container cnn-layout">
+            <aside class="left-panel">
+                <section class="panel input-panel">
+                    <div class="panel-header compact">
+                        <h2>Draw Pattern</h2>
+                        <button id="cnn-clear-btn" class="btn btn-sm">Clear</button>
+                    </div>
+                    <div class="panel-body cnn-input-body"><canvas id="cnn-input-canvas"></canvas></div>
+                </section>
+                <section class="panel prediction-panel">
+                    <div class="panel-header compact">
+                        <h2>Prediction</h2>
+                    </div>
+                    <div class="panel-body" id="cnn-prediction-container"></div>
+                </section>
+            </aside>
+            <main class="middle-panel">
+                <section class="panel network-panel">
+                    <div class="panel-header compact">
+                        <h2>CNN Architecture</h2><span id="cnn-weight-count" class="badge">0 weights</span>
+                    </div>
+                    <div class="panel-body"><canvas id="cnn-network-canvas"></canvas></div>
+                </section>
+                <section class="panel feature-panel">
+                    <div class="panel-header compact">
+                        <h2>Feature Maps</h2>
+                    </div>
+                    <div class="panel-body"><canvas id="cnn-feature-canvas"></canvas></div>
+                </section>
+                <div class="metrics-row">
+                    <section class="panel metric-panel">
+                        <div class="panel-header compact">
+                            <h2>Loss</h2><span id="cnn-current-loss" class="badge loss-badge">0.0000</span>
+                        </div>
+                        <div class="panel-body"><canvas id="cnn-loss-canvas"></canvas></div>
+                    </section>
+                    <section class="panel metric-panel">
+                        <div class="panel-header compact">
+                            <h2>Accuracy</h2><span id="cnn-current-accuracy" class="badge accuracy-badge">0.00%</span>
+                        </div>
+                        <div class="panel-body"><canvas id="cnn-accuracy-canvas"></canvas></div>
+                    </section>
+                </div>
+                <div class="training-bar">
+                    <div class="epoch-badge">Epoch <span id="cnn-epoch-counter">0</span></div>
+                    <button id="cnn-play-btn" class="btn btn-primary">▶ Play</button>
+                    <button id="cnn-step-btn" class="btn">⏭ Step</button>
+                    <button id="cnn-reset-btn" class="btn btn-danger">↺ Reset</button>
+                </div>
+            </main>
+            <aside class="right-panel">
+                <div class="params-header"><span>Parameters</span></div>
+                <div class="param-group"><label>Dataset</label>
+                    <select id="cnn-dataset" class="select">
+                        <option value="patterns" selected>Patterns</option>
+                        <option value="shapes">Shapes</option>
+                    </select>
+                </div>
+                <div class="param-group"><label>Load Pattern</label>
+                    <select id="cnn-pattern-select" class="select">
+                        <option value="">-- Select --</option>
+                        <option value="0">Horizontal</option>
+                        <option value="1">Vertical</option>
+                        <option value="2">Diagonal</option>
+                        <option value="3">Cross</option>
+                    </select>
+                </div>
+                <div class="param-group"><label>Learning Rate</label>
+                    <input type="number" id="cnn-learning-rate" class="input" value="0.01" min="0.001" max="1"
+                        step="0.001">
+                </div>
+                <div class="param-group"><label>Step Size</label>
+                    <select id="cnn-step-size" class="select">
+                        <option value="1">1</option>
+                        <option value="5" selected>5</option>
+                        <option value="10">10</option>
+                    </select>
+                </div>
+            </aside>
+        </div>
+    </div><!-- end cnn-mode -->
+
     <!-- Scripts -->
     <script src="nn-engine.js"></script>
     <script src="rnn-engine.js"></script>
+    <script src="lstm-engine.js"></script>
+    <script src="transformer-engine.js"></script>
+    <script src="cnn-engine.js"></script>
     <script src="network-visualizer.js"></script>
     <script src="curve-visualizer.js"></script>
     <script src="classification-visualizer.js"></script>
     <script src="rnn-visualizer.js"></script>
+    <script src="lstm-visualizer.js"></script>
+    <script src="transformer-visualizer.js"></script>
+    <script src="cnn-visualizer.js"></script>
     <script src="metrics.js"></script>
     <script src="charts.js"></script>
     <script src="forward-pass-graph.js"></script>
