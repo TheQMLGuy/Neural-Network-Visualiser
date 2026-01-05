@@ -720,11 +720,6 @@ body {
     max-height: none !important;
 }
 
-/* Hide mode header when any panel is fullscreen to prevent accidental back navigation */
-body:has(.panel.fullscreen) #mode-header {
-    display: none !important;
-}
-
 /* Modal Fullscreen */
 .modal-content.fullscreen {
     position: fixed !important;
@@ -1734,6 +1729,61 @@ body:has(.panel.fullscreen) #mode-header {
 .select-sm {
     padding: 4px 8px;
     font-size: 0.75rem;
+}
+
+/* ============================================
+   RNN LAYOUT
+   ============================================ */
+
+.rnn-layout {
+    display: grid;
+    grid-template-columns: 280px 1fr 220px;
+    height: 100%;
+    padding: 12px;
+    gap: 12px;
+}
+
+.rnn-layout .left-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.rnn-layout .left-panel .panel {
+    flex: 1;
+    min-height: 0;
+}
+
+.hidden-state-panel {
+    max-height: 150px;
+}
+
+.sequence-panel {
+    flex: 2;
+    min-height: 0;
+}
+
+.sequence-panel .panel-body {
+    flex: 1;
+    position: relative;
+}
+
+.sequence-panel canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* RNN Legend dots */
+.legend-compact .input-dot {
+    background: rgba(99, 102, 241, 0.8);
+}
+
+.legend-compact .target-dot {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.legend-compact .predicted-dot {
+    background: #10b981;
 }
 
 /* Responsive landing page */

@@ -43,17 +43,17 @@
                     <button class="btn btn-primary problem-start">Start →</button>
                 </div>
 
-                <!-- More Coming Soon Card -->
-                <div class="problem-card problem-card-disabled">
-                    <div class="problem-icon">🔮</div>
-                    <h2>More Coming Soon</h2>
-                    <p>Autoencoders, clustering, sequence models, and more neural network experiments.</p>
+                <!-- RNN Card -->
+                <div class="problem-card" data-mode="rnn">
+                    <div class="problem-icon">🔄</div>
+                    <h2>Recurrent Neural Network</h2>
+                    <p>Learn sequences and predict patterns using hidden state memory across timesteps.</p>
                     <ul class="problem-features">
-                        <li>Autoencoders</li>
-                        <li>Clustering</li>
-                        <li>Image recognition</li>
+                        <li>Sequence prediction</li>
+                        <li>Hidden state visualization</li>
+                        <li>Backprop through time (BPTT)</li>
                     </ul>
-                    <button class="btn problem-start" disabled>Coming Soon</button>
+                    <button class="btn btn-primary problem-start">Start →</button>
                 </div>
             </div>
         </div>
@@ -342,13 +342,11 @@
         <div class="app-container classification-layout">
             <!-- LEFT: Network -->
             <aside class="left-panel">
-                <section id="cls-network-panel" class="panel network-panel">
+                <section class="panel network-panel">
                     <div class="panel-header compact">
                         <h2>Network</h2>
                         <div class="header-right">
                             <span id="cls-weight-count" class="badge">0 weights</span>
-                            <button id="btn-fullscreen-cls-network" class="btn btn-xs btn-fullscreen"
-                                title="Fullscreen">⛶</button>
                         </div>
                     </div>
                     <div class="panel-body">
@@ -367,7 +365,7 @@
 
             <!-- MIDDLE: Classification Visualizer -->
             <main class="middle-panel">
-                <section id="cls-decision-panel" class="panel classification-panel">
+                <section class="panel classification-panel">
                     <div class="panel-header compact">
                         <h2>Decision Boundary</h2>
                         <div class="header-right">
@@ -379,8 +377,6 @@
                                 </select>
                             </label>
                             <button id="cls-clear-points" class="btn btn-xs btn-danger">Clear</button>
-                            <button id="btn-fullscreen-cls-decision" class="btn btn-xs btn-fullscreen"
-                                title="Fullscreen">⛶</button>
                         </div>
                     </div>
                     <div class="panel-body">
@@ -510,11 +506,162 @@
         </div>
     </div><!-- end classification-mode -->
 
+    <!-- RNN MODE -->
+    <div id="rnn-mode" class="mode-container hidden">
+        <div class="app-container rnn-layout">
+            <!-- LEFT: Network -->
+            <aside class="left-panel">
+                <section class="panel network-panel">
+                    <div class="panel-header compact">
+                        <h2>RNN Network</h2>
+                        <div class="header-right">
+                            <span id="rnn-weight-count" class="badge">0 weights</span>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <canvas id="rnn-network-canvas"></canvas>
+                    </div>
+                </section>
+
+                <section class="panel hidden-state-panel">
+                    <div class="panel-header compact">
+                        <h2>Hidden State</h2>
+                    </div>
+                    <div class="panel-body">
+                        <canvas id="rnn-hidden-canvas"></canvas>
+                    </div>
+                </section>
+            </aside>
+
+            <!-- MIDDLE: Sequence Visualization -->
+            <main class="middle-panel">
+                <section class="panel sequence-panel">
+                    <div class="panel-header compact">
+                        <h2>Sequence Prediction</h2>
+                        <div class="header-right">
+                            <span class="legend-compact">
+                                <span class="dot input-dot"></span>Input
+                                <span class="dot target-dot"></span>Target
+                                <span class="dot predicted-dot"></span>Predicted
+                            </span>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <canvas id="rnn-sequence-canvas"></canvas>
+                    </div>
+                </section>
+
+                <div class="metrics-row">
+                    <section class="panel metric-panel">
+                        <div class="panel-header compact">
+                            <h2>Loss</h2>
+                            <span id="rnn-current-loss" class="badge loss-badge">0.0000</span>
+                        </div>
+                        <div class="panel-body">
+                            <canvas id="rnn-loss-canvas"></canvas>
+                        </div>
+                    </section>
+
+                    <section class="panel metric-panel">
+                        <div class="panel-header compact">
+                            <h2>Accuracy</h2>
+                            <span id="rnn-current-accuracy" class="badge accuracy-badge">0.00%</span>
+                        </div>
+                        <div class="panel-body">
+                            <canvas id="rnn-accuracy-canvas"></canvas>
+                        </div>
+                    </section>
+                </div>
+
+                <div class="training-bar">
+                    <div class="epoch-badge">
+                        Epoch <span id="rnn-epoch-counter">0</span>
+                    </div>
+                    <button id="rnn-play-btn" class="btn btn-primary">▶ Play</button>
+                    <button id="rnn-step-btn" class="btn">⏭ Step</button>
+                    <button id="rnn-reset-btn" class="btn btn-danger">↺ Reset</button>
+                </div>
+            </main>
+
+            <!-- RIGHT: Parameters -->
+            <aside class="right-panel">
+                <div class="params-header">
+                    <span>Parameters</span>
+                </div>
+
+                <div class="param-group">
+                    <label>Dataset</label>
+                    <select id="rnn-dataset" class="select">
+                        <option value="sineWave" selected>Sine Wave</option>
+                        <option value="squareWave">Square Wave</option>
+                        <option value="echo">Echo (delay=3)</option>
+                        <option value="adding">Adding Problem</option>
+                    </select>
+                </div>
+
+                <div class="param-group">
+                    <label>Hidden Units</label>
+                    <select id="rnn-hidden-size" class="select">
+                        <option value="4">4</option>
+                        <option value="8" selected>8</option>
+                        <option value="16">16</option>
+                        <option value="32">32</option>
+                    </select>
+                </div>
+
+                <div class="param-group">
+                    <label>Sequence Length</label>
+                    <select id="rnn-seq-length" class="select">
+                        <option value="10">10</option>
+                        <option value="15">15</option>
+                        <option value="20" selected>20</option>
+                        <option value="30">30</option>
+                    </select>
+                </div>
+
+                <div class="param-group">
+                    <label>Activation</label>
+                    <select id="rnn-activation-select" class="select">
+                        <option value="tanh" selected>Tanh</option>
+                        <option value="sigmoid">Sigmoid</option>
+                        <option value="relu">ReLU</option>
+                    </select>
+                </div>
+
+                <div class="param-group">
+                    <label>Optimizer</label>
+                    <select id="rnn-optimizer-select" class="select">
+                        <option value="sgd">SGD</option>
+                        <option value="adam" selected>Adam</option>
+                    </select>
+                </div>
+
+                <div class="param-group">
+                    <label>Learning Rate</label>
+                    <input type="number" id="rnn-learning-rate" class="input" value="0.01" min="0.001" max="1"
+                        step="0.001">
+                </div>
+
+                <div class="param-group">
+                    <label>Step Size</label>
+                    <select id="rnn-step-size" class="select">
+                        <option value="1">1</option>
+                        <option value="5" selected>5</option>
+                        <option value="10">10</option>
+                        <option value="50">50</option>
+                    </select>
+                </div>
+            </aside>
+        </div>
+    </div><!-- end rnn-mode -->
+
     <!-- Scripts -->
     <script src="nn-engine.js"></script>
+    <script src="rnn-engine.js"></script>
     <script src="network-visualizer.js"></script>
     <script src="curve-visualizer.js"></script>
     <script src="classification-visualizer.js"></script>
+    <script src="rnn-visualizer.js"></script>
     <script src="metrics.js"></script>
     <script src="charts.js"></script>
     <script src="forward-pass-graph.js"></script>

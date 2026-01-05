@@ -294,10 +294,6 @@ class App {
                 // Check for any fullscreen panel
                 const fullscreenPanel = document.querySelector('.panel.fullscreen');
                 if (fullscreenPanel) {
-                    // Ignore classification panels (handled by ClassificationApp)
-                    if (fullscreenPanel.id && fullscreenPanel.id.startsWith('cls-')) {
-                        return;
-                    }
                     this.toggleFullscreen(fullscreenPanel.id);
                     return;
                 }
@@ -876,45 +872,6 @@ class ClassificationApp {
                 }
             });
         }
-
-        // Fullscreen toggles
-        const fsNetwork = document.getElementById('btn-fullscreen-cls-network');
-        if (fsNetwork) {
-            fsNetwork.addEventListener('click', () => this.toggleFullscreen('cls-network-panel'));
-        }
-
-        const fsDecision = document.getElementById('btn-fullscreen-cls-decision');
-        if (fsDecision) {
-            fsDecision.addEventListener('click', () => this.toggleFullscreen('cls-decision-panel'));
-        }
-
-        // ESC key to exit fullscreen (Classification specific)
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                const fullscreenPanel = document.querySelector('.panel.fullscreen');
-                if (fullscreenPanel && fullscreenPanel.id && fullscreenPanel.id.startsWith('cls-')) {
-                    this.toggleFullscreen(fullscreenPanel.id);
-                }
-            }
-        });
-    }
-
-    toggleFullscreen(panelId) {
-        const panel = document.getElementById(panelId);
-        if (!panel) return;
-
-        panel.classList.toggle('fullscreen');
-
-        // Trigger resize
-        setTimeout(() => {
-            if (this.networkViz) this.networkViz.resize();
-            if (this.classificationViz) this.classificationViz.resize();
-
-            // Re-render controls if network panel is resized
-            if (panelId === 'cls-network-panel') {
-                this.renderNodeControls();
-            }
-        }, 50);
     }
 
     addLayer() {
@@ -1104,6 +1061,300 @@ class ClassificationApp {
 }
 
 /**
+ * RNN Mode Application
+ */
+class RNNApp {
+    constructor() {
+        // Network configuration
+        this.inputSize = 1;
+        this.hiddenSize = 8;
+        this.outputSize = 1;
+        this.activationName = 'tanh';
+        this.optimizerName = 'adam';
+        this.learningRate = 0.01;
+
+        // Sequence configuration
+        this.sequenceLength = 20;
+        this.datasetName = 'sineWave';
+
+        // Training state
+        this.isPlaying = false;
+        this.animationId = null;
+        this.stepSize = 5;
+        this.accuracyHistory = [];
+
+        // Data
+        this.sequences = [];
+        this.targets = [];
+        this.currentSequenceIndex = 0;
+
+        // Initialize components
+        this.initNetwork();
+        this.initVisualizers();
+        this.initControls();
+        this.generateData();
+
+        // Initial render
+        this.updateDisplay();
+
+        setTimeout(() => {
+            this.sequenceViz.resize();
+            this.networkViz.resize();
+            this.hiddenViz.resize();
+        }, 100);
+    }
+
+    initNetwork() {
+        this.network = new RecurrentNeuralNetwork(
+            this.inputSize,
+            this.hiddenSize,
+            this.outputSize,
+            {
+                activationName: this.activationName,
+                optimizerName: this.optimizerName,
+                learningRate: this.learningRate
+            }
+        );
+    }
+
+    initVisualizers() {
+        this.sequenceViz = new RNNSequenceVisualizer('rnn-sequence-canvas');
+        this.networkViz = new RNNNetworkVisualizer('rnn-network-canvas');
+        this.hiddenViz = new RNNHiddenStateVisualizer('rnn-hidden-canvas');
+        this.lossChart = new LossChart('rnn-loss-canvas');
+        this.accuracyChart = new AccuracyChart('rnn-accuracy-canvas');
+
+        this.sequenceViz.setNetwork(this.network);
+        this.networkViz.setNetwork(this.network);
+        this.hiddenViz.setNetwork(this.network);
+    }
+
+    initControls() {
+        // Dataset selection
+        document.getElementById('rnn-dataset').addEventListener('change', (e) => {
+            this.datasetName = e.target.value;
+            this.generateData();
+            this.reset();
+        });
+
+        // Hidden size
+        document.getElementById('rnn-hidden-size').addEventListener('change', (e) => {
+            this.hiddenSize = parseInt(e.target.value);
+            this.rebuildNetwork();
+        });
+
+        // Sequence length
+        document.getElementById('rnn-seq-length').addEventListener('change', (e) => {
+            this.sequenceLength = parseInt(e.target.value);
+            this.generateData();
+            this.reset();
+        });
+
+        // Activation
+        document.getElementById('rnn-activation-select').addEventListener('change', (e) => {
+            this.activationName = e.target.value;
+            this.network.setActivation(this.activationName);
+        });
+
+        // Optimizer
+        document.getElementById('rnn-optimizer-select').addEventListener('change', (e) => {
+            this.optimizerName = e.target.value;
+            this.network.setOptimizer(this.optimizerName);
+        });
+
+        // Learning rate
+        document.getElementById('rnn-learning-rate').addEventListener('change', (e) => {
+            this.learningRate = parseFloat(e.target.value);
+            this.network.setLearningRate(this.learningRate);
+        });
+
+        // Step size
+        document.getElementById('rnn-step-size').addEventListener('change', (e) => {
+            this.stepSize = parseInt(e.target.value);
+        });
+
+        // Training controls
+        document.getElementById('rnn-play-btn').addEventListener('click', () => this.togglePlay());
+        document.getElementById('rnn-step-btn').addEventListener('click', () => this.step());
+        document.getElementById('rnn-reset-btn').addEventListener('click', () => this.reset());
+    }
+
+    generateData() {
+        // Set input size based on dataset
+        if (this.datasetName === 'adding') {
+            this.inputSize = 2;
+        } else {
+            this.inputSize = 1;
+        }
+
+        // Generate dataset
+        const dataset = RNNDatasets[this.datasetName](this.sequenceLength);
+        this.sequences = dataset.sequences;
+        this.targets = dataset.targets;
+        this.currentSequenceIndex = 0;
+
+        // Rebuild network if input size changed
+        if (this.network && this.network.inputSize !== this.inputSize) {
+            this.rebuildNetwork();
+        }
+
+        // Show first sequence
+        this.showCurrentSequence();
+    }
+
+    rebuildNetwork() {
+        this.stop();
+        this.network = new RecurrentNeuralNetwork(
+            this.inputSize,
+            this.hiddenSize,
+            this.outputSize,
+            {
+                activationName: this.activationName,
+                optimizerName: this.optimizerName,
+                learningRate: this.learningRate
+            }
+        );
+
+        this.sequenceViz.setNetwork(this.network);
+        this.networkViz.setNetwork(this.network);
+        this.hiddenViz.setNetwork(this.network);
+        this.accuracyHistory = [];
+
+        this.updateDisplay();
+    }
+
+    showCurrentSequence() {
+        if (this.sequences.length === 0) return;
+
+        const seq = this.sequences[this.currentSequenceIndex];
+        const tgt = this.targets[this.currentSequenceIndex];
+
+        // Get prediction
+        const predicted = this.network.predict(seq);
+
+        this.sequenceViz.setData(seq, tgt, predicted);
+    }
+
+    togglePlay() {
+        if (this.isPlaying) {
+            this.stop();
+        } else {
+            this.play();
+        }
+    }
+
+    play() {
+        this.isPlaying = true;
+        document.getElementById('rnn-play-btn').textContent = '⏸ Pause';
+        document.getElementById('rnn-play-btn').classList.add('playing');
+        this.trainingLoop();
+    }
+
+    stop() {
+        this.isPlaying = false;
+        document.getElementById('rnn-play-btn').textContent = '▶ Play';
+        document.getElementById('rnn-play-btn').classList.remove('playing');
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+            this.animationId = null;
+        }
+    }
+
+    trainingLoop() {
+        if (!this.isPlaying) return;
+
+        for (let i = 0; i < this.stepSize; i++) {
+            this.trainEpoch();
+        }
+
+        this.updateDisplay();
+        this.animationId = requestAnimationFrame(() => this.trainingLoop());
+    }
+
+    step() {
+        for (let i = 0; i < this.stepSize; i++) {
+            this.trainEpoch();
+        }
+        this.updateDisplay();
+    }
+
+    trainEpoch() {
+        // Train on all sequences
+        this.network.train(this.sequences, this.targets);
+
+        // Calculate accuracy (MSE based)
+        const accuracy = this.calculateAccuracy();
+        this.accuracyHistory.push(accuracy);
+    }
+
+    calculateAccuracy() {
+        if (this.sequences.length === 0) return 0;
+
+        let totalError = 0;
+        let count = 0;
+
+        for (let i = 0; i < Math.min(10, this.sequences.length); i++) {
+            const outputs = this.network.predict(this.sequences[i]);
+            const targets = this.targets[i];
+
+            for (let t = 0; t < outputs.length; t++) {
+                const pred = outputs[t][0];
+                const tgt = Array.isArray(targets[t]) ? targets[t][0] : targets[t];
+                totalError += Math.abs(pred - tgt);
+                count++;
+            }
+        }
+
+        // Convert error to accuracy (0-100%)
+        const avgError = totalError / count;
+        const accuracy = Math.max(0, 100 * (1 - avgError));
+        return accuracy;
+    }
+
+    reset() {
+        this.stop();
+        this.network.reinitialize();
+        this.accuracyHistory = [];
+        this.currentSequenceIndex = 0;
+
+        this.lossChart.reset();
+        this.accuracyChart.reset();
+
+        this.updateDisplay();
+    }
+
+    updateDisplay() {
+        // Update epoch counter
+        document.getElementById('rnn-epoch-counter').textContent = this.network.epoch;
+
+        // Update loss display
+        const loss = this.network.lossHistory.length > 0
+            ? this.network.lossHistory[this.network.lossHistory.length - 1]
+            : 0;
+        document.getElementById('rnn-current-loss').textContent = loss.toFixed(4);
+
+        // Update accuracy display
+        const accuracy = this.accuracyHistory.length > 0
+            ? this.accuracyHistory[this.accuracyHistory.length - 1]
+            : 0;
+        document.getElementById('rnn-current-accuracy').textContent = accuracy.toFixed(2) + '%';
+
+        // Update weight count
+        const stats = this.network.getWeightStats();
+        document.getElementById('rnn-weight-count').textContent = `${stats.count} weights`;
+
+        // Show current sequence with predictions
+        this.showCurrentSequence();
+
+        // Render visualizations
+        this.networkViz.render();
+        this.hiddenViz.render();
+        this.lossChart.update(this.network.lossHistory);
+        this.accuracyChart.update(this.accuracyHistory);
+    }
+}
+
+/**
  * Mode Controller - Handles navigation between modes
  */
 class ModeController {
@@ -1111,6 +1362,7 @@ class ModeController {
         this.currentMode = 'landing';
         this.regressionApp = null;
         this.classificationApp = null;
+        this.rnnApp = null;
 
         this.setupEventListeners();
     }
@@ -1136,6 +1388,7 @@ class ModeController {
         document.getElementById('mode-header').classList.add('hidden');
         document.getElementById('regression-mode').classList.add('hidden');
         document.getElementById('classification-mode').classList.add('hidden');
+        document.getElementById('rnn-mode').classList.add('hidden');
 
         this.currentMode = mode;
 
@@ -1176,6 +1429,26 @@ class ModeController {
                         }
                         if (this.classificationApp.classificationViz) {
                             this.classificationApp.classificationViz.resize();
+                        }
+                    }, 50);
+                }
+            } else if (mode === 'rnn') {
+                document.getElementById('mode-title').textContent = 'Recurrent Neural Network';
+                document.getElementById('rnn-mode').classList.remove('hidden');
+
+                // Lazy init
+                if (!this.rnnApp) {
+                    this.rnnApp = new RNNApp();
+                } else {
+                    setTimeout(() => {
+                        if (this.rnnApp.sequenceViz) {
+                            this.rnnApp.sequenceViz.resize();
+                        }
+                        if (this.rnnApp.networkViz) {
+                            this.rnnApp.networkViz.resize();
+                        }
+                        if (this.rnnApp.hiddenViz) {
+                            this.rnnApp.hiddenViz.resize();
                         }
                     }, 50);
                 }
